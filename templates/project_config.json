@@ -1,0 +1,22 @@
+{
+  "communication": {
+    "serial_port": "COM1",
+    "baud_rate": 115200,
+    "wifi_ssid": "",
+    "wifi_ip": "192.168.1.100",
+    "wifi_port": 80,
+    "device_name": "ESP32-S3-WROOM-PLC"
+  },
+  "project": {
+    "name": "",
+    "description": "",
+    "version": "1.0.0",
+    "scan_time": 100,
+    "watchdog_enable": true,
+    "auto_start": false,
+    "emergency_stop": "None",
+    "safe_state_outputs": true
+  },
+  "io_configuration": {},
+  "register_mappings": {}
+}

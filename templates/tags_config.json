@@ -1,0 +1,163 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "created": "2025-08-07",
+    "description": "ESP32-S3-WROOM PLC Tags Configuration Template",
+    "project_name": "Default Project",
+    "author": "ESP32 PLC GUI"
+  },
+  "physical_io": [
+    {
+      "name": "DI_00",
+      "io_type": "Digital Input",
+      "gpio_pin": "GPIO2",
+      "physical_address": "GPIO_2",
+      "data_type": "BOOL",
+      "initial_value": "0",
+      "description": "Emergency Stop Button",
+      "enabled": true,
+      "pin_mode": "INPUT_PULLUP",
+      "interrupt_mode": "FALLING",
+      "debounce_time": 50
+    },
+    {
+      "name": "DO_00", 
+      "io_type": "Digital Output",
+      "gpio_pin": "GPIO4",
+      "physical_address": "GPIO_4",
+      "data_type": "BOOL",
+      "initial_value": "0",
+      "description": "Status LED",
+      "enabled": true,
+      "pin_mode": "OUTPUT"
+    },
+    {
+      "name": "AI_00",
+      "io_type": "Analog Input", 
+      "gpio_pin": "GPIO1",
+      "physical_address": "ADC1_CH0",
+      "data_type": "INT",
+      "initial_value": "0",
+      "description": "Temperature Sensor",
+      "enabled": true,
+      "scale_min": 0.0,
+      "scale_max": 100.0,
+      "engineering_units": "°C"
+    }
+  ],
+  "hardware_registers": [
+    {
+      "name": "REG_GPIO_OUT",
+      "register_name": "GPIO_OUT_REG",
+      "physical_address": "0x3FF44004",
+      "data_type": "DWORD",
+      "access": "RW",
+      "description": "GPIO Output Register",
+      "enabled": false,
+      "register_category": "GPIO"
+    },
+    {
+      "name": "REG_ADC1_DATA",
+      "register_name": "SENS_SAR_MEAS_CTRL_REG",
+      "physical_address": "0x3FF48800",
+      "data_type": "DWORD", 
+      "access": "R",
+      "description": "ADC1 Measurement Data Register",
+      "enabled": false,
+      "register_category": "ADC"
+    }
+  ],
+  "software_variables": [
+    {
+      "name": "PLC_STATUS",
+      "data_type": "BOOL",
+      "initial_value": "false",
+      "memory_address": "0x3FFAE000",
+      "persistent": true,
+      "array_size": 1,
+      "min_value": "false",
+      "max_value": "true",
+      "description": "PLC Running Status",
+      "retain_on_power_loss": true
+    },
+    {
+      "name": "CYCLE_COUNT",
+      "data_type": "DWORD",
+      "initial_value": "0",
+      "memory_address": "0x3FFAE004",
+      "persistent": true,
+      "array_size": 1,
+      "min_value": "0",
+      "max_value": "4294967295",
+      "description": "PLC Cycle Counter",
+      "retain_on_power_loss": true
+    },
+    {
+      "name": "TEMP_SETPOINT",
+      "data_type": "FLOAT",
+      "initial_value": "25.0",
+      "memory_address": "0x3FFAE008",
+      "persistent": true,
+      "array_size": 1,
+      "min_value": "0.0",
+      "max_value": "100.0",
+      "description": "Temperature Setpoint",
+      "engineering_units": "°C"
+    },
+    {
+      "name": "ALARM_MESSAGES",
+      "data_type": "STRING",
+      "initial_value": "",
+      "memory_address": "0x3FFAE00C",
+      "persistent": false,
+      "array_size": 10,
+      "description": "System Alarm Messages Array"
+    }
+  ],
+  "memory_allocation": {
+    "current_offset": 2572,
+    "allocated_variables": {
+      "1073414144": {
+        "size": 1,
+        "type": "BOOL",
+        "array_size": 1
+      },
+      "1073414148": {
+        "size": 4,
+        "type": "DWORD", 
+        "array_size": 1
+      },
+      "1073414152": {
+        "size": 4,
+        "type": "FLOAT",
+        "array_size": 1
+      },
+      "1073414156": {
+        "size": 2560,
+        "type": "STRING",
+        "array_size": 10
+      }
+    }
+  },
+  "global_settings": {
+    "scan_rate": 100,
+    "communication_timeout": 5000,
+    "max_retries": 3,
+    "enable_watchdog": true,
+    "watchdog_timeout": 10000
+  },
+  "memory_regions": {
+    "ram_base_address": "0x3FFAE000",
+    "flash_base_address": "0x400000", 
+    "max_ram_usage": 327680,
+    "reserved_ram": 32768,
+    "available_ram": 294912
+  },
+  "validation_rules": {
+    "max_tag_name_length": 32,
+    "allowed_characters": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_",
+    "reserved_words": ["if", "else", "while", "for", "return", "int", "float", "bool", "string"],
+    "max_gpio_pins": 48,
+    "max_software_variables": 1000
+  }
+}

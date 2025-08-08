@@ -1,0 +1,212 @@
+{
+  "device_info": {
+    "name": "ESP32-S3-WROOM",
+    "chip": "ESP32-S3",
+    "module": "WROOM",
+    "cores": 2,
+    "base_frequency": 240,
+    "flash_size": "8MB", 
+        "digital_io_template": {
+      "DI_00": {"gpio": "GPIO21", "type": "BOOL", "access": "R"},
+      "DI_01": {"gpio": "GPIO35", "type": "BOOL", "access": "R"},
+      "DI_02": {"gpio": "GPIO36", "type": "BOOL", "access": "R"},
+      "DI_03": {"gpio": "GPIO37", "type": "BOOL", "access": "R"},
+      "DO_00": {"gpio": "GPIO45", "type": "BOOL", "access": "RW"},
+      "DO_01": {"gpio": "GPIO46", "type": "BOOL", "access": "RW"},
+      "DO_02": {"gpio": "GPIO38", "type": "BOOL", "access": "RW"},
+      "DO_03": {"gpio": "GPIO39", "type": "BOOL", "access": "RW"}
+    },
+    "analog_io_template": {
+      "AI_00": {"gpio": "GPIO1", "channel": "ADC1_CH0", "type": "INT", "access": "R"},
+      "AI_01": {"gpio": "GPIO2", "channel": "ADC1_CH1", "type": "INT", "access": "R"},
+      "AI_02": {"gpio": "GPIO3", "channel": "ADC1_CH2", "type": "INT", "access": "R"},
+      "AI_03": {"gpio": "GPIO4", "channel": "ADC1_CH3", "type": "INT", "access": "R"},
+      "AO_00": {"gpio": "GPIO47", "channel": "PWM0", "type": "INT", "access": "RW", "mode": "PWM"},
+      "AO_01": {"gpio": "GPIO48", "channel": "PWM1", "type": "INT", "access": "RW", "mode": "PWM"}
+    }
+  }
+}
+    "metadata": {
+      "version": "1.0",
+      "description": "ESP32-S3 Register Definitions for PLC Communication",
+      "last_updated": "2025-08-07"
+    },
+    "gpio_registers": {
+      "GPIO_OUT": {
+        "address": "0x3FF44004",
+        "type": "uint32",
+        "access": "RW",
+        "description": "GPIO output register",
+        "bits": {
+          "0-31": "GPIO 0-31 output values"
+        }
+      },
+      "GPIO_IN": {
+        "address": "0x3FF4403C",
+        "type": "uint32",
+        "access": "R",
+        "description": "GPIO input register",
+        "bits": {
+          "0-31": "GPIO 0-31 input values"
+        }
+      },
+      "GPIO_ENABLE": {
+        "address": "0x3FF44020",
+        "type": "uint32",
+        "access": "RW",
+        "description": "GPIO output enable register",
+        "bits": {
+          "0-31": "GPIO 0-31 output enable"
+        }
+      }
+    },
+    "adc_registers": {
+      "SENS_SAR_READ_CTRL": {
+        "address": "0x3FF48800",
+        "type": "uint32",
+        "access": "RW",
+        "description": "ADC read control register"
+      },
+      "SENS_SAR_READ_STATUS": {
+        "address": "0x3FF48804",
+        "type": "uint32",
+        "access": "R",
+        "description": "ADC read status register"
+      }
+    },
+    "pwm_registers": {
+      "LEDC_HSCH0_CONF0": {
+        "address": "0x3FF59000",
+        "type": "uint32",
+        "access": "RW",
+        "description": "LEDC high speed channel 0 configuration 0"
+      },
+      "LEDC_HSCH0_DUTY": {
+        "address": "0x3FF59008",
+        "type": "uint32",
+        "access": "RW",
+        "description": "LEDC high speed channel 0 duty cycle"
+      }
+    },
+    "timer_registers": {
+      "TIMG_T0CONFIG": {
+        "address": "0x3FF5F000",
+        "type": "uint32",
+        "access": "RW",
+        "description": "Timer group 0 timer 0 configuration"
+      },
+      "TIMG_T0LO": {
+        "address": "0x3FF5F004",
+        "type": "uint32",
+        "access": "R",
+        "description": "Timer group 0 timer 0 low 32 bits"
+      },
+      "TIMG_T0HI": {
+        "address": "0x3FF5F008",
+        "type": "uint32",
+        "access": "R",
+        "description": "Timer group 0 timer 0 high 32 bits"
+      }
+    },
+    "system_registers": {
+      "RTC_CNTL_TIME_LOW0": {
+        "address": "0x3FF48800",
+        "type": "uint32",
+        "access": "R",
+        "description": "RTC time low register"
+      },
+      "SYSTEM_CORE_1_CONTROL_0": {
+        "address": "0x3FF00000",
+        "type": "uint32",
+        "access": "RW",
+        "description": "Core 1 control register"
+      }
+    }
+  },
+  "pin_definitions": {
+    "digital_io": {
+      "GPIO0": {"type": "IO", "adc": null, "touch": null, "special": "Boot button"},
+      "GPIO1": {"type": "IO", "adc": "ADC1_CH0", "touch": "T1", "special": null},
+      "GPIO2": {"type": "IO", "adc": "ADC1_CH1", "touch": "T2", "special": null},
+      "GPIO3": {"type": "IO", "adc": "ADC1_CH2", "touch": "T3", "special": null},
+      "GPIO4": {"type": "IO", "adc": "ADC1_CH3", "touch": "T4", "special": null},
+      "GPIO5": {"type": "IO", "adc": "ADC1_CH4", "touch": "T5", "special": null},
+      "GPIO6": {"type": "IO", "adc": "ADC1_CH5", "touch": "T6", "special": null},
+      "GPIO7": {"type": "IO", "adc": "ADC1_CH6", "touch": "T7", "special": null},
+      "GPIO8": {"type": "IO", "adc": "ADC1_CH7", "touch": "T8", "special": null},
+      "GPIO9": {"type": "IO", "adc": "ADC1_CH8", "touch": "T9", "special": null},
+      "GPIO10": {"type": "IO", "adc": "ADC1_CH9", "touch": "T10", "special": null},
+      "GPIO11": {"type": "IO", "adc": "ADC2_CH0", "touch": "T11", "special": null},
+      "GPIO12": {"type": "IO", "adc": "ADC2_CH1", "touch": "T12", "special": null},
+      "GPIO13": {"type": "IO", "adc": "ADC2_CH2", "touch": "T13", "special": null},
+      "GPIO14": {"type": "IO", "adc": "ADC2_CH3", "touch": "T14", "special": null},
+      "GPIO15": {"type": "IO", "adc": "ADC2_CH4", "touch": null, "special": null},
+      "GPIO16": {"type": "IO", "adc": "ADC2_CH5", "touch": null, "special": null},
+      "GPIO17": {"type": "IO", "adc": "ADC2_CH6", "touch": null, "special": null},
+      "GPIO18": {"type": "IO", "adc": "ADC2_CH7", "touch": null, "special": null},
+      "GPIO19": {"type": "IO", "adc": "ADC2_CH8", "touch": null, "special": "USB D-"},
+      "GPIO20": {"type": "IO", "adc": "ADC2_CH9", "touch": null, "special": "USB D+"},
+      "GPIO21": {"type": "IO", "adc": null, "touch": null, "special": null},
+      "GPIO35": {"type": "IO", "adc": null, "touch": null, "special": null},
+      "GPIO36": {"type": "IO", "adc": null, "touch": null, "special": null},
+      "GPIO37": {"type": "IO", "adc": null, "touch": null, "special": null},
+      "GPIO38": {"type": "IO", "adc": null, "touch": null, "special": null},
+      "GPIO39": {"type": "IO", "adc": null, "touch": null, "special": "MTCK"},
+      "GPIO40": {"type": "IO", "adc": null, "touch": null, "special": "MTDO"},
+      "GPIO41": {"type": "IO", "adc": null, "touch": null, "special": "MTDI"},
+      "GPIO42": {"type": "IO", "adc": null, "touch": null, "special": "MTMS"},
+      "GPIO43": {"type": "IO", "adc": null, "touch": null, "special": "UART0 TX"},
+      "GPIO44": {"type": "IO", "adc": null, "touch": null, "special": "UART0 RX"},
+      "GPIO45": {"type": "IO", "adc": null, "touch": null, "special": null},
+      "GPIO46": {"type": "IO", "adc": null, "touch": null, "special": null},
+      "GPIO47": {"type": "IO", "adc": null, "touch": null, "special": "PWM_AO0"},
+      "GPIO48": {"type": "IO", "adc": null, "touch": null, "special": "PWM_AO1"}
+    },
+    "pwm_channels": {
+      "LEDC_CH0": {"gpio": null, "frequency": 5000, "resolution": 8},
+      "LEDC_CH1": {"gpio": null, "frequency": 5000, "resolution": 8},
+      "LEDC_CH2": {"gpio": null, "frequency": 5000, "resolution": 8},
+      "LEDC_CH3": {"gpio": null, "frequency": 5000, "resolution": 8},
+      "LEDC_CH4": {"gpio": null, "frequency": 5000, "resolution": 8},
+      "LEDC_CH5": {"gpio": null, "frequency": 5000, "resolution": 8},
+      "LEDC_CH6": {"gpio": null, "frequency": 5000, "resolution": 8},
+      "LEDC_CH7": {"gpio": null, "frequency": 5000, "resolution": 8}
+    }
+  },
+  "communication_settings": {
+    "serial": {
+      "default_baud": 115200,
+      "supported_bauds": [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600],
+      "data_bits": 8,
+      "stop_bits": 1,
+      "parity": "None"
+    },
+    "wifi": {
+      "default_port": 80,
+      "supported_protocols": ["HTTP", "WebSocket", "TCP"],
+      "security": ["WPA2", "WPA3"]
+    }
+  },
+  "default_tag_mappings": {
+    "system_inputs": {
+      "System.Time": {"register": "RTC_CNTL_TIME_LOW0", "type": "DWORD", "access": "R"},
+      "System.ScanTime": {"register": "TIMG_T0LO", "type": "DWORD", "access": "R"}
+    },
+    "digital_io_template": {
+      "DI_00": {"gpio": "GPIO34", "type": "BOOL", "access": "R"},
+      "DI_01": {"gpio": "GPIO35", "type": "BOOL", "access": "R"},
+      "DI_02": {"gpio": "GPIO36", "type": "BOOL", "access": "R"},
+      "DI_03": {"gpio": "GPIO39", "type": "BOOL", "access": "R"},
+      "DO_00": {"gpio": "GPIO2", "type": "BOOL", "access": "RW"},
+      "DO_01": {"gpio": "GPIO4", "type": "BOOL", "access": "RW"},
+      "DO_02": {"gpio": "GPIO5", "type": "BOOL", "access": "RW"},
+      "DO_03": {"gpio": "GPIO18", "type": "BOOL", "access": "RW"}
+    },
+    "analog_io_template": {
+      "AI_00": {"gpio": "GPIO1", "channel": "ADC1_CH0", "type": "INT", "access": "R"},
+      "AI_01": {"gpio": "GPIO2", "channel": "ADC1_CH1", "type": "INT", "access": "R"},
+      "AO_00": {"gpio": "GPIO47", "channel": "PWM0", "type": "INT", "access": "RW", "mode": "PWM"},
+      "AO_01": {"gpio": "GPIO48", "channel": "PWM1", "type": "INT", "access": "RW", "mode": "PWM"}
+    }
+  }
+}

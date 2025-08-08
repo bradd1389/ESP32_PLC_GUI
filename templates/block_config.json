@@ -1,0 +1,262 @@
+{
+  "block_types": {
+    "Wire Router": {
+      "width": 75,
+      "height": 40,
+      "description": "Passthrough routing block for clean flowchart organization",
+      "category": "routing",
+      "ports": 4,
+      "logic_type": "passthrough"
+    },
+    "Turn On/Off": {
+      "width": 100,
+      "height": 40,
+      "description": "Boolean toggle block for on/off operations",
+      "category": "control",
+      "ports": 4,
+      "logic_type": "boolean"
+    },
+    "Calculator": {
+      "width": 100,
+      "height": 40,
+      "description": "Mathematical operations and calculations",
+      "category": "math",
+      "ports": 4,
+      "logic_type": "expression"
+    },
+    "Copy": {
+      "width": 100,
+      "height": 40,
+      "description": "Copy input value to output",
+      "category": "data",
+      "ports": 4,
+      "logic_type": "passthrough"
+    },
+    "Counter": {
+      "width": 100,
+      "height": 40,
+      "description": "Counting operations with increment/decrement",
+      "category": "math",
+      "ports": 4,
+      "logic_type": "counter"
+    },
+    "Filter": {
+      "width": 100,
+      "height": 40,
+      "description": "Data filtering and conditioning",
+      "category": "data",
+      "ports": 4,
+      "logic_type": "filter"
+    },
+    "Motion In": {
+      "width": 100,
+      "height": 40,
+      "description": "Motion control input processing",
+      "category": "motion",
+      "ports": 4,
+      "logic_type": "motion_input"
+    },
+    "Motion Out": {
+      "width": 100,
+      "height": 40,
+      "description": "Motion control output generation",
+      "category": "motion",
+      "ports": 4,
+      "logic_type": "motion_output"
+    },
+    "PID": {
+      "width": 100,
+      "height": 40,
+      "description": "PID controller for process control",
+      "category": "control",
+      "ports": 4,
+      "logic_type": "pid"
+    },
+    "PWM": {
+      "width": 100,
+      "height": 40,
+      "description": "Pulse Width Modulation output",
+      "category": "output",
+      "ports": 4,
+      "logic_type": "pwm"
+    },
+    "Ramp": {
+      "width": 100,
+      "height": 40,
+      "description": "Ramp generator for smooth transitions",
+      "category": "control",
+      "ports": 4,
+      "logic_type": "ramp"
+    },
+    "Scale": {
+      "width": 100,
+      "height": 40,
+      "description": "Value scaling and range conversion",
+      "category": "math",
+      "ports": 4,
+      "logic_type": "scale"
+    },
+    "Shift / Rotate": {
+      "width": 100,
+      "height": 40,
+      "description": "Bit shifting and rotation operations",
+      "category": "bitwise",
+      "ports": 4,
+      "logic_type": "bitwise"
+    },
+    "Statistics": {
+      "width": 100,
+      "height": 40,
+      "description": "Statistical analysis and calculations",
+      "category": "math",
+      "ports": 4,
+      "logic_type": "statistics"
+    },
+    "Subroutine": {
+      "width": 100,
+      "height": 40,
+      "description": "Call to external subroutine or function",
+      "category": "control",
+      "ports": 4,
+      "logic_type": "subroutine"
+    },
+    "Timer / Clock": {
+      "width": 100,
+      "height": 40,
+      "description": "Timer and clock operations",
+      "category": "timing",
+      "ports": 4,
+      "logic_type": "timer"
+    },
+    "Note": {
+      "width": 100,
+      "height": 40,
+      "description": "Documentation and comments",
+      "category": "documentation",
+      "ports": 0,
+      "logic_type": "comment"
+    },
+    "Code Block": {
+      "width": 100,
+      "height": 40,
+      "description": "Custom code in Python/C/C++",
+      "category": "custom",
+      "ports": 4,
+      "logic_type": "custom_code"
+    },
+    "ON?": {
+      "width": 100,
+      "height": 40,
+      "description": "Check if input is ON/True",
+      "category": "logic",
+      "ports": 4,
+      "logic_type": "boolean_check"
+    },
+    "OFF?": {
+      "width": 100,
+      "height": 40,
+      "description": "Check if input is OFF/False",
+      "category": "logic",
+      "ports": 4,
+      "logic_type": "boolean_check"
+    },
+    "<": {
+      "width": 100,
+      "height": 40,
+      "description": "Less than comparison",
+      "category": "comparison",
+      "ports": 4,
+      "logic_type": "comparison"
+    },
+    ">": {
+      "width": 100,
+      "height": 40,
+      "description": "Greater than comparison",
+      "category": "comparison",
+      "ports": 4,
+      "logic_type": "comparison"
+    },
+    "<=": {
+      "width": 100,
+      "height": 40,
+      "description": "Less than or equal comparison",
+      "category": "comparison",
+      "ports": 4,
+      "logic_type": "comparison"
+    },
+    ">=": {
+      "width": 100,
+      "height": 40,
+      "description": "Greater than or equal comparison",
+      "category": "comparison",
+      "ports": 4,
+      "logic_type": "comparison"
+    },
+    "=": {
+      "width": 100,
+      "height": 40,
+      "description": "Equal comparison",
+      "category": "comparison",
+      "ports": 4,
+      "logic_type": "comparison"
+    },
+    "≠": {
+      "width": 100,
+      "height": 40,
+      "description": "Not equal comparison",
+      "category": "comparison",
+      "ports": 4,
+      "logic_type": "comparison"
+    }
+  },
+  "categories": {
+    "routing": {
+      "color": "#E8F4FD",
+      "description": "Flow control and routing blocks"
+    },
+    "control": {
+      "color": "#FFF2CC",
+      "description": "Control logic and automation blocks"
+    },
+    "math": {
+      "color": "#E1D5E7",
+      "description": "Mathematical operations and calculations"
+    },
+    "data": {
+      "color": "#D5E8D4",
+      "description": "Data processing and manipulation"
+    },
+    "motion": {
+      "color": "#FFE6CC",
+      "description": "Motion control and positioning"
+    },
+    "output": {
+      "color": "#F8CECC",
+      "description": "Output generation and control"
+    },
+    "bitwise": {
+      "color": "#E1D5E7",
+      "description": "Bit manipulation operations"
+    },
+    "timing": {
+      "color": "#DAE8FC",
+      "description": "Timing and scheduling operations"
+    },
+    "documentation": {
+      "color": "#F5F5F5",
+      "description": "Documentation and comments"
+    },
+    "custom": {
+      "color": "#FFCCCC",
+      "description": "Custom code blocks"
+    },
+    "logic": {
+      "color": "#D4EDDA",
+      "description": "Boolean logic operations"
+    },
+    "comparison": {
+      "color": "#CCE5FF",
+      "description": "Comparison and conditional operations"
+    }
+  }
+}
