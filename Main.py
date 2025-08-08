@@ -385,3 +385,124 @@ if __name__ == "__main__":
     win = MainWindow()
     win.show()
     sys.exit(app.exec())
+
+def main():
+    """Entry point for console script"""
+    app = QApplication(sys.argv)
+    
+    # Set global application stylesheet to fix highlighting issues
+    global_style = """
+    QTableWidget {
+        selection-background-color: #3daee9;
+        selection-color: white;
+        alternate-background-color: #f0f0f0;
+        gridline-color: #d0d0d0;
+        background-color: white;
+        color: black;
+    }
+    
+    QTableWidget::item:selected {
+        background-color: #3daee9;
+        color: white;
+    }
+    
+    QTableWidget::item:hover {
+        background-color: #e0f0ff;
+        color: black;
+    }
+    
+    QTreeWidget {
+        selection-background-color: #3daee9;
+        selection-color: white;
+        alternate-background-color: #f0f0f0;
+        background-color: white;
+        color: black;
+    }
+    
+    QTreeWidget::item:selected {
+        background-color: #3daee9;
+        color: white;
+    }
+    
+    QTreeWidget::item:hover {
+        background-color: #e0f0ff;
+        color: black;
+    }
+    
+    QComboBox {
+        selection-background-color: #3daee9;
+        selection-color: white;
+        background-color: white;
+        color: black;
+    }
+    
+    QComboBox QAbstractItemView {
+        selection-background-color: #3daee9;
+        selection-color: white;
+        background-color: white;
+        color: black;
+    }
+    
+    QComboBox QAbstractItemView::item:selected {
+        background-color: #3daee9;
+        color: white;
+    }
+    
+    QComboBox QAbstractItemView::item:hover {
+        background-color: #e0f0ff;
+        color: black;
+    }
+    
+    QListWidget {
+        selection-background-color: #3daee9;
+        selection-color: white;
+        alternate-background-color: #f0f0f0;
+        background-color: white;
+        color: black;
+    }
+    
+    QListWidget::item:selected {
+        background-color: #3daee9;
+        color: white;
+    }
+    
+    QListWidget::item:hover {
+        background-color: #e0f0ff;
+        color: black;
+    }
+    
+    QLineEdit:focus {
+        border: 2px solid #3daee9;
+        background-color: white;
+        color: black;
+    }
+    
+    QTextEdit:focus {
+        border: 2px solid #3daee9;
+        background-color: white;
+        color: black;
+    }
+    
+    QTabWidget::pane {
+        border: 1px solid #c0c0c0;
+        background-color: white;
+    }
+    
+    QTabBar::tab:selected {
+        background-color: #3daee9;
+        color: white;
+    }
+    
+    QTabBar::tab:hover {
+        background-color: #e0f0ff;
+        color: black;
+    }
+    """
+    app.setStyleSheet(global_style)
+    
+    win = MainWindow()
+    win.show()
+    sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()
