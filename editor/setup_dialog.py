@@ -687,6 +687,7 @@ class SetupDialog(QDialog):
             # Import physical I/O tags
             physical_io = tag_config.get('physical_io', [])
             for tag in physical_io:
+                # Skip disabled tags
                 if not tag.get('enabled', False):
                     continue
                     
@@ -762,21 +763,24 @@ class SetupDialog(QDialog):
                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                    QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                # First export Setup → Tags
-                self.export_to_tags()
-                
-                # Then update Setup with any Tags-specific configurations
-                self.import_from_tags()
-                
-                self.sync_status_label.setText("Status: Synchronization complete")
-                self.sync_status_label.setStyleSheet("color: blue; font-weight: bold;")
-                
-            except Exception as e:
-                self.sync_status_label.setText(f"Status: Sync failed - {str(e)}")
-                self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
-                QMessageBox.critical(self, "Sync Error", f"Synchronization failed:\n{str(e)}")
+        # Early return if user declines
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+            
+        try:
+            # First export Setup → Tags
+            self.export_to_tags()
+            
+            # Then update Setup with any Tags-specific configurations
+            self.import_from_tags()
+            
+            self.sync_status_label.setText("Status: Synchronization complete")
+            self.sync_status_label.setStyleSheet("color: blue; font-weight: bold;")
+            
+        except Exception as e:
+            self.sync_status_label.setText(f"Status: Sync failed - {str(e)}")
+            self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
+            QMessageBox.critical(self, "Sync Error", f"Synchronization failed:\n{str(e)}")
 
     def add_digital_input_from_tag(self, tag):
         """Add digital input configuration from tag"""
@@ -945,23 +949,26 @@ class SetupDialog(QDialog):
         # Look for existing row with matching GPIO pin
         for row in range(table.rowCount()):
             pin_item = table.item(row, 2)
-            if pin_item and pin_item.text() == config.get('gpio_pin', ''):
-                # Update existing row
-                name_widget = table.cellWidget(row, 0)
-                type_widget = table.cellWidget(row, 1)
-                enabled_widget = table.cellWidget(row, 7)
+            # Skip rows without matching GPIO pin
+            if not pin_item or pin_item.text() != config.get('gpio_pin', ''):
+                continue
                 
-                if isinstance(name_widget, QLineEdit):
-                    name_widget.setText(config.get('name', ''))
-                if isinstance(type_widget, QComboBox):
-                    # Check if this I/O type is available for this pin
-                    available_types = [type_widget.itemText(i) for i in range(type_widget.count())]
-                    if io_type in available_types:
-                        type_widget.setCurrentText(io_type)
-                if isinstance(enabled_widget, QCheckBox):
-                    enabled_widget.setChecked(True)
-                
-                return True
+            # Update existing row
+            name_widget = table.cellWidget(row, 0)
+            type_widget = table.cellWidget(row, 1)
+            enabled_widget = table.cellWidget(row, 7)
+            
+            if isinstance(name_widget, QLineEdit):
+                name_widget.setText(config.get('name', ''))
+            if isinstance(type_widget, QComboBox):
+                # Check if this I/O type is available for this pin
+                available_types = [type_widget.itemText(i) for i in range(type_widget.count())]
+                if io_type in available_types:
+                    type_widget.setCurrentText(io_type)
+            if isinstance(enabled_widget, QCheckBox):
+                enabled_widget.setChecked(True)
+            
+            return True
         
         return False
 

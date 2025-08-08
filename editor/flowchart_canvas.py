@@ -132,13 +132,18 @@ class FlowchartCanvas(QGraphicsView):
         if scene is None:
             return
         for item in scene.items():
-            if isinstance(item, DraggableBlock) and item != blk:
-                if item.mapRectToScene(item.boundingRect()).intersects(new_rect):
-                    # Find a non-overlapping position nearby
-                    offset = QPointF(blk.boundingRect().width() + 10, 0)
-                    pt += offset
-                    blk.setPos(pt - QPointF(75, 20))
-                    new_rect = blk.mapRectToScene(blk.boundingRect())
+            # Use inverted returns to reduce nesting
+            if not isinstance(item, DraggableBlock) or item == blk:
+                continue
+                
+            if not item.mapRectToScene(item.boundingRect()).intersects(new_rect):
+                continue
+                
+            # Find a non-overlapping position nearby
+            offset = QPointF(blk.boundingRect().width() + 10, 0)
+            pt += offset
+            blk.setPos(pt - QPointF(75, 20))
+            new_rect = blk.mapRectToScene(blk.boundingRect())
         scene.addItem(blk)
         blk.setPos(pt - QPointF(75, 20))
         
@@ -154,11 +159,16 @@ class FlowchartCanvas(QGraphicsView):
         blk.setPos(QPointF(x, y))
         # Prevent overlap with other blocks
         for item in scene.items():
-            if isinstance(item, DraggableBlock) and item != blk:
-                if item.mapRectToScene(item.boundingRect()).intersects(blk.mapRectToScene(blk.boundingRect())):
-                    # Hard stop: revert to previous position
-                    blk.setPos(blk.pos())
-                    break
+            # Use inverted returns to reduce nesting
+            if not isinstance(item, DraggableBlock) or item == blk:
+                continue
+                
+            if not item.mapRectToScene(item.boundingRect()).intersects(blk.mapRectToScene(blk.boundingRect())):
+                continue
+                
+            # Hard stop: revert to previous position
+            blk.setPos(blk.pos())
+            break
 
         self._expand_scene()
         event.acceptProposedAction()
@@ -167,17 +177,21 @@ class FlowchartCanvas(QGraphicsView):
         if event is None:
             return
         
-        # Right-click cancels wire creation
+        # Right-click cancels wire creation - use inverted return
         if event.button() == Qt.MouseButton.RightButton:
-            if self._temp_wire:
-                scene = self.scene()
-                if scene is not None:
-                    scene.removeItem(self._temp_wire)
-                self._temp_wire = None
-                self._wire_points = []
-                self._wire_start_point = None
-                self._dragging_from = None
-                self._dragging_from_port = None
+            # Early return if no temp wire to cancel
+            if not self._temp_wire:
+                return super().mousePressEvent(event)
+                
+            # Cancel wire creation
+            scene = self.scene()
+            if scene is not None:
+                scene.removeItem(self._temp_wire)
+            self._temp_wire = None
+            self._wire_points = []
+            self._wire_start_point = None
+            self._dragging_from = None
+            self._dragging_from_port = None
             return
             
         scene_pt = self.mapToScene(event.pos())
@@ -185,44 +199,55 @@ class FlowchartCanvas(QGraphicsView):
         items = scene.items(scene_pt) if scene is not None else []
         
         for it in items:
-            if isinstance(it, QGraphicsEllipseItem):
-                blk = it.parentItem()
-                if isinstance(blk, DraggableBlock):
-                    # Find which port was clicked
-                    clicked_port = None
-                    for port_name, port in blk.ports.items():
-                        if port == it:
-                            clicked_port = port_name
+            # Skip non-ellipse items
+            if not isinstance(it, QGraphicsEllipseItem):
+                continue
+                
+            blk = it.parentItem()
+            # Skip non-blocks
+            if not isinstance(blk, DraggableBlock):
+                continue
+                
+            # Find which port was clicked
+            clicked_port = None
+            for port_name, port in blk.ports.items():
+                if port == it:
+                    clicked_port = port_name
+                    break
+            
+            # Skip if no port found
+            if not clicked_port:
+                continue
+                
+            # Check if this port already has a wire connected and user wants to delete it
+            if (clicked_port == blk.output_port and blk.out_wires) or (clicked_port in blk.input_ports and blk.in_wires):
+                # Delete existing wire by clicking on connected port
+                if clicked_port == blk.output_port and blk.out_wires:
+                    self._disconnect_wire(blk.out_wires[0])
+                elif clicked_port in blk.input_ports and blk.in_wires:
+                    # Find the wire connected to this specific input port
+                    for wire in blk.in_wires[:]:  # Copy list to avoid modification during iteration
+                        if hasattr(wire, 'to_port') and wire.to_port == clicked_port:
+                            self._disconnect_wire(wire)
                             break
-                    
-                    if clicked_port:
-                        # Check if this port already has a wire connected and user wants to delete it
-                        if (clicked_port == blk.output_port and blk.out_wires) or (clicked_port in blk.input_ports and blk.in_wires):
-                            # Delete existing wire by clicking on connected port
-                            if clicked_port == blk.output_port and blk.out_wires:
-                                self._disconnect_wire(blk.out_wires[0])
-                            elif clicked_port in blk.input_ports and blk.in_wires:
-                                # Find the wire connected to this specific input port
-                                for wire in blk.in_wires[:]:  # Copy list to avoid modification during iteration
-                                    if hasattr(wire, 'to_port') and wire.to_port == clicked_port:
-                                        self._disconnect_wire(wire)
-                                        break
-                            return
-                        
-                        # Check if this can be an output port (start wire from here)
-                        if blk.assign_output_port(clicked_port):
-                            # This is a new output port assignment, start wire creation
-                            self._dragging_from = blk
-                            self._dragging_from_port = clicked_port
-                            p0 = it.mapToScene(it.rect().center())
-                            if p0 is not None:
-                                # Start with auto-routed wire for preview
-                                self._wire_start_point = p0
-                                self._temp_wire = AutoRoutedWire(p0, p0)
-                                scene = self.scene()
-                                if scene is not None:
-                                    scene.addItem(self._temp_wire)
-                            return
+                return
+            
+            # Check if this can be an output port (start wire from here)
+            if not blk.assign_output_port(clicked_port):
+                continue
+                
+            # This is a new output port assignment, start wire creation
+            self._dragging_from = blk
+            self._dragging_from_port = clicked_port
+            p0 = it.mapToScene(it.rect().center())
+            if p0 is not None:
+                # Start with auto-routed wire for preview
+                self._wire_start_point = p0
+                self._temp_wire = AutoRoutedWire(p0, p0)
+                scene = self.scene()
+                if scene is not None:
+                    scene.addItem(self._temp_wire)
+            return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -253,164 +278,225 @@ class FlowchartCanvas(QGraphicsView):
                     blk.setPos(QPointF(x, y))
                     # Prevent overlap with other blocks
                     for item in scene.items():
-                        if isinstance(item, DraggableBlock) and item != blk:
-                            while item.mapRectToScene(item.boundingRect()).intersects(blk.mapRectToScene(blk.boundingRect())):
-                                blk.setPos(blk.pos() + QPointF(w + 10, 0))
-                                x = min(max(blk.x(), cs), sr.width() - w)
-                                blk.setPos(QPointF(x, y))
+                        # Skip non-blocks or same block
+                        if not isinstance(item, DraggableBlock) or item == blk:
+                            continue
+                            
+                        # Check for intersection and adjust position
+                        while item.mapRectToScene(item.boundingRect()).intersects(blk.mapRectToScene(blk.boundingRect())):
+                            blk.setPos(blk.pos() + QPointF(w + 10, 0))
+                            x = min(max(blk.x(), cs), sr.width() - w)
+                            blk.setPos(QPointF(x, y))
                 # Dynamically update wires for all blocks during move
                 for item in scene.items():
-                    if isinstance(item, DraggableBlock):
-                        # Update input wires
-                        for wire in getattr(item, 'in_wires', []):
-                            if isinstance(wire, WireSegment) and hasattr(wire, 'to_port') and wire.to_port:
-                                if wire.to_port in item.ports:
-                                    p_in = item.ports[wire.to_port].mapToScene(item.ports[wire.to_port].rect().center())
-                                    if p_in is not None and len(wire.points) > 0:
-                                        wire.points[-1] = p_in
-                                        wire.update_path()
-                        # Update output wires
-                        for wire in getattr(item, 'out_wires', []):
-                            if isinstance(wire, WireSegment) and hasattr(wire, 'from_port') and wire.from_port:
-                                if wire.from_port in item.ports:
-                                    p_out = item.ports[wire.from_port].mapToScene(item.ports[wire.from_port].rect().center())
-                                    if p_out is not None and len(wire.points) > 0:
-                                        wire.points[0] = p_out
-                                        wire.update_path()
+                    # Skip non-blocks
+                    if not isinstance(item, DraggableBlock):
+                        continue
+                        
+                    # Update input wires
+                    for wire in getattr(item, 'in_wires', []):
+                        # Skip non-wire segments or wires without proper attributes
+                        if not isinstance(wire, WireSegment) or not hasattr(wire, 'to_port') or not wire.to_port:
+                            continue
+                            
+                        # Skip if port not in item ports
+                        if wire.to_port not in item.ports:
+                            continue
+                            
+                        p_in = item.ports[wire.to_port].mapToScene(item.ports[wire.to_port].rect().center())
+                        if p_in is not None and len(wire.points) > 0:
+                            wire.points[-1] = p_in
+                            wire.update_path()
+                            
+                    # Update output wires
+                    for wire in getattr(item, 'out_wires', []):
+                        # Skip non-wire segments or wires without proper attributes
+                        if not isinstance(wire, WireSegment) or not hasattr(wire, 'from_port') or not wire.from_port:
+                            continue
+                            
+                        # Skip if port not in item ports
+                        if wire.from_port not in item.ports:
+                            continue
+                            
+                        p_out = item.ports[wire.from_port].mapToScene(item.ports[wire.from_port].rect().center())
+                        if p_out is not None and len(wire.points) > 0:
+                            wire.points[0] = p_out
+                            wire.update_path()
 
     def mouseReleaseEvent(self, event):
         # Ensure _wire_arrows is always available
         if not hasattr(self, '_wire_arrows'):
             self._wire_arrows = {}
+        
+        # Early return if no event
         if event is None:
             return
-        if self._temp_wire and self._dragging_from:
-            scene_pt = self.mapToScene(event.pos())
-            scene = self.scene()
-            placed = False
-            if scene is not None:
-                # Check items at the specific mouse position first
-                items_at_pos = scene.items(scene_pt)
-                port_found = False
+            
+        # Early return if no temp wire or dragging source
+        if not self._temp_wire or not self._dragging_from:
+            return super().mouseReleaseEvent(event)
+            
+        scene_pt = self.mapToScene(event.pos())
+        scene = self.scene()
+        placed = False
+        
+        # Early return if no scene
+        if scene is None:
+            return super().mouseReleaseEvent(event)
+            
+        # Check items at the specific mouse position first
+        items_at_pos = scene.items(scene_pt)
+        port_found = False
+        
+        # First try: exact position match
+        for item in items_at_pos:
+            # Skip non-ellipse items
+            if not isinstance(item, QGraphicsEllipseItem):
+                continue
                 
-                # First try: exact position match
-                for item in items_at_pos:
-                    if isinstance(item, QGraphicsEllipseItem):
-                        dst = item.parentItem()
-                        if isinstance(dst, DraggableBlock) and dst != self._dragging_from:
-                            # Find which port this is
-                            clicked_port = None
-                            for port_name, port in dst.ports.items():
-                                if port == item:
-                                    clicked_port = port_name
-                                    break
-                            
-                            if clicked_port:
-                                # Check if this can be an input port (complete wire here)
-                                if dst.assign_input_port(clicked_port):
-                                    p1 = item.mapToScene(item.rect().center())
-                                    if self._temp_wire:
-                                        # Handle auto-routed wire completion
-                                        if isinstance(self._temp_wire, AutoRoutedWire) and self._wire_start_point is not None:
-                                            self._temp_wire.update_endpoints(self._wire_start_point, p1)
-                                        elif isinstance(self._temp_wire, WireSegment) and len(self._wire_points) > 0:
-                                            # Legacy segment wire completion
-                                            self._wire_points.append(p1)
-                                            self._temp_wire.points = self._wire_points
-                                            self._temp_wire.update_path()
-                                        
-                                        # Set up wire relationships
-                                        self._temp_wire.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-                                        self._temp_wire.from_block = self._dragging_from
-                                        self._temp_wire.from_port = self._dragging_from_port
-                                        self._temp_wire.to_block = dst
-                                        self._temp_wire.to_port = clicked_port
-                                        
-                                        # Add to wire lists
-                                        if self._dragging_from:
-                                            self._dragging_from.out_wires.append(self._temp_wire)
-                                        dst.in_wires.append(self._temp_wire)
-                                        
-                                        # Update port colors
-                                        if self._dragging_from:
-                                            self._dragging_from.update_port_colors()
-                                        dst.update_port_colors()
-                                        
-                                        # Emit project modified signal
-                                        self.project_modified.emit()
-                                        
-                                        placed = True
-                                        port_found = True
-                                        # Wire is complete, clear temp state
-                                        self._temp_wire = None
-                                        self._wire_points = []
-                                        self._wire_start_point = None
-                                        self._dragging_from = None
-                                        self._dragging_from_port = None
-                                        break
+            dst = item.parentItem()
+            # Skip non-blocks or same block
+            if not isinstance(dst, DraggableBlock) or dst == self._dragging_from:
+                continue
                 
-                # Second try: nearby ports if no exact match (for segmented wires)
-                if not port_found:
-                    tolerance = 25  # Increased tolerance for segmented wires
-                    for item in scene.items():
-                        if isinstance(item, QGraphicsEllipseItem):
-                            dst = item.parentItem()
-                            if isinstance(dst, DraggableBlock) and dst != self._dragging_from:
-                                # Check if mouse is near this port
-                                port_center = item.mapToScene(item.rect().center())
-                                mouse_distance = (scene_pt - port_center).manhattanLength()
-                                
-                                if mouse_distance <= tolerance:
-                                    # Find which port this is
-                                    clicked_port = None
-                                    for port_name, port in dst.ports.items():
-                                        if port == item:
-                                            clicked_port = port_name
-                                            break
-                                    
-                                    if clicked_port:
-                                        # Check if this can be an input port (complete wire here)
-                                        if dst.assign_input_port(clicked_port):
-                                            p1 = port_center
-                                            if self._temp_wire:
-                                                # Handle auto-routed wire completion
-                                                if isinstance(self._temp_wire, AutoRoutedWire) and self._wire_start_point is not None:
-                                                    self._temp_wire.update_endpoints(self._wire_start_point, p1)
-                                                elif isinstance(self._temp_wire, WireSegment) and len(self._wire_points) > 0:
-                                                    # Legacy segment wire completion
-                                                    self._wire_points.append(p1)
-                                                    self._temp_wire.points = self._wire_points
-                                                    self._temp_wire.update_path()
-                                                
-                                                # Set up wire relationships
-                                                self._temp_wire.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-                                                self._temp_wire.from_block = self._dragging_from
-                                                self._temp_wire.from_port = self._dragging_from_port
-                                                self._temp_wire.to_block = dst
-                                                self._temp_wire.to_port = clicked_port
-                                                
-                                                # Add to wire lists
-                                                if self._dragging_from:
-                                                    self._dragging_from.out_wires.append(self._temp_wire)
-                                                dst.in_wires.append(self._temp_wire)
-                                                
-                                                # Update port colors
-                                                if self._dragging_from:
-                                                    self._dragging_from.update_port_colors()
-                                                dst.update_port_colors()
-                                                
-                                                placed = True
-                                                # Wire is complete, clear temp state
-                                                self._temp_wire = None
-                                                self._wire_points = []
-                                                self._wire_start_point = None
-                                                self._dragging_from = None
-                                                self._dragging_from_port = None
-                                                break
-            # Don't remove wire if not placed - keep it active for more bend points
-            # User can right-click or press Escape to cancel
-        else:
-            super().mouseReleaseEvent(event)
+            # Find which port this is
+            clicked_port = None
+            for port_name, port in dst.ports.items():
+                if port == item:
+                    clicked_port = port_name
+                    break
+            
+            # Skip if no port found
+            if not clicked_port:
+                continue
+                
+            # Check if this can be an input port (complete wire here)
+            if not dst.assign_input_port(clicked_port):
+                continue
+                
+            p1 = item.mapToScene(item.rect().center())
+            # Skip if no temp wire
+            if not self._temp_wire:
+                continue
+                
+            # Handle auto-routed wire completion
+            if isinstance(self._temp_wire, AutoRoutedWire) and self._wire_start_point is not None:
+                self._temp_wire.update_endpoints(self._wire_start_point, p1)
+            elif isinstance(self._temp_wire, WireSegment) and len(self._wire_points) > 0:
+                # Legacy segment wire completion
+                self._wire_points.append(p1)
+                self._temp_wire.points = self._wire_points
+                self._temp_wire.update_path()
+            
+            # Set up wire relationships
+            self._temp_wire.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+            self._temp_wire.from_block = self._dragging_from
+            self._temp_wire.from_port = self._dragging_from_port
+            self._temp_wire.to_block = dst
+            self._temp_wire.to_port = clicked_port
+            
+            # Add to wire lists
+            if self._dragging_from:
+                self._dragging_from.out_wires.append(self._temp_wire)
+            dst.in_wires.append(self._temp_wire)
+            
+            # Update port colors
+            if self._dragging_from:
+                self._dragging_from.update_port_colors()
+            dst.update_port_colors()
+            
+            # Emit project modified signal
+            self.project_modified.emit()
+            
+            placed = True
+            port_found = True
+            # Wire is complete, clear temp state
+            self._temp_wire = None
+            self._wire_points = []
+            self._wire_start_point = None
+            self._dragging_from = None
+            self._dragging_from_port = None
+            break
+        
+        # Second try: nearby ports if no exact match (for segmented wires)
+        if not port_found:
+            tolerance = 25  # Increased tolerance for segmented wires
+            for item in scene.items():
+                # Skip non-ellipse items
+                if not isinstance(item, QGraphicsEllipseItem):
+                    continue
+                    
+                dst = item.parentItem()
+                # Skip non-blocks or same block
+                if not isinstance(dst, DraggableBlock) or dst == self._dragging_from:
+                    continue
+                    
+                # Check if mouse is near this port
+                port_center = item.mapToScene(item.rect().center())
+                mouse_distance = (scene_pt - port_center).manhattanLength()
+                
+                # Skip if not within tolerance
+                if mouse_distance > tolerance:
+                    continue
+                    
+                # Find which port this is
+                clicked_port = None
+                for port_name, port in dst.ports.items():
+                    if port == item:
+                        clicked_port = port_name
+                        break
+                
+                # Skip if no port found
+                if not clicked_port:
+                    continue
+                    
+                # Check if this can be an input port (complete wire here)
+                if not dst.assign_input_port(clicked_port):
+                    continue
+                    
+                p1 = port_center
+                # Skip if no temp wire
+                if not self._temp_wire:
+                    continue
+                    
+                # Handle auto-routed wire completion
+                if isinstance(self._temp_wire, AutoRoutedWire) and self._wire_start_point is not None:
+                    self._temp_wire.update_endpoints(self._wire_start_point, p1)
+                elif isinstance(self._temp_wire, WireSegment) and len(self._wire_points) > 0:
+                    # Legacy segment wire completion
+                    self._wire_points.append(p1)
+                    self._temp_wire.points = self._wire_points
+                    self._temp_wire.update_path()
+                
+                # Set up wire relationships
+                self._temp_wire.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+                self._temp_wire.from_block = self._dragging_from
+                self._temp_wire.from_port = self._dragging_from_port
+                self._temp_wire.to_block = dst
+                self._temp_wire.to_port = clicked_port
+                
+                # Add to wire lists
+                if self._dragging_from:
+                    self._dragging_from.out_wires.append(self._temp_wire)
+                dst.in_wires.append(self._temp_wire)
+                
+                # Update port colors
+                if self._dragging_from:
+                    self._dragging_from.update_port_colors()
+                dst.update_port_colors()
+                
+                placed = True
+                # Wire is complete, clear temp state
+                self._temp_wire = None
+                self._wire_points = []
+                self._wire_start_point = None
+                self._dragging_from = None
+                self._dragging_from_port = None
+                break
+                
+        # Don't remove wire if not placed - keep it active for more bend points
+        # User can right-click or press Escape to cancel
+
     def mouseDoubleClickEvent(self, event):
         # Auto-routed wires don't need manual bend points
         # Double-click is disabled for wire creation
@@ -433,15 +519,18 @@ class FlowchartCanvas(QGraphicsView):
             return
         if event.key() == Qt.Key.Key_Delete:
             scene = self.scene()
-            if scene is not None:
-                from editor.start_block import StartBlock
-                for itm in list(scene.selectedItems()):
-                    if isinstance(itm, QGraphicsPathItem):
-                        self._disconnect_wire(itm)
-                    elif isinstance(itm, StartBlock):
-                        continue  # Prevent StartBlock deletion
-                    else:
-                        scene.removeItem(itm)
+            # Early return if no scene
+            if scene is None:
+                return
+                
+            from editor.start_block import StartBlock
+            for itm in list(scene.selectedItems()):
+                if isinstance(itm, QGraphicsPathItem):
+                    self._disconnect_wire(itm)
+                elif isinstance(itm, StartBlock):
+                    continue  # Prevent StartBlock deletion
+                else:
+                    scene.removeItem(itm)
             self._expand_scene()
             return
         if event.matches(QKeySequence.StandardKey.Copy):
@@ -460,11 +549,14 @@ class FlowchartCanvas(QGraphicsView):
             # Store wire connections between selected blocks
             for i, src_blk in enumerate(sel):
                 for wire in getattr(src_blk, 'out_wires', []):
-                    if hasattr(wire, 'to_block'):
-                        for j, dst_blk in enumerate(sel):
-                            if wire.to_block == dst_blk:
-                                self._wire_buffer.append((i, j, wire.from_port, wire.to_port))
-                                break
+                    # Skip if wire has no to_block attribute
+                    if not hasattr(wire, 'to_block'):
+                        continue
+                        
+                    for j, dst_blk in enumerate(sel):
+                        if wire.to_block == dst_blk:
+                            self._wire_buffer.append((i, j, wire.from_port, wire.to_port))
+                            break
             return
 
         if event.matches(QKeySequence.StandardKey.Paste):
@@ -487,32 +579,38 @@ class FlowchartCanvas(QGraphicsView):
             
             # Recreate wire connections
             for src_i, dst_i, from_port, to_port in getattr(self, '_wire_buffer', []):
-                if src_i < len(new_blocks) and dst_i < len(new_blocks):
-                    src_blk = new_blocks[src_i]
-                    dst_blk = new_blocks[dst_i]
+                # Skip if indices are out of range
+                if src_i >= len(new_blocks) or dst_i >= len(new_blocks):
+                    continue
                     
-                    # Set up port assignments
-                    src_blk.assign_output_port(from_port)
-                    dst_blk.assign_input_port(to_port)
+                src_blk = new_blocks[src_i]
+                dst_blk = new_blocks[dst_i]
+                
+                # Set up port assignments
+                src_blk.assign_output_port(from_port)
+                dst_blk.assign_input_port(to_port)
+                
+                # Create wire
+                p_out = src_blk.ports[from_port].mapToScene(src_blk.ports[from_port].rect().center())
+                p_in = dst_blk.ports[to_port].mapToScene(dst_blk.ports[to_port].rect().center())
+                
+                # Skip if positions are not valid
+                if not p_out or not p_in:
+                    continue
                     
-                    # Create wire
-                    p_out = src_blk.ports[from_port].mapToScene(src_blk.ports[from_port].rect().center())
-                    p_in = dst_blk.ports[to_port].mapToScene(dst_blk.ports[to_port].rect().center())
-                    
-                    if p_out and p_in:
-                        # Use auto-routed wire for better routing
-                        wire = AutoRoutedWire(p_out, p_in)
-                        wire.from_block = src_blk
-                        wire.from_port = from_port
-                        wire.to_block = dst_blk
-                        wire.to_port = to_port
-                        
-                        # Add to wire lists
-                        src_blk.out_wires.append(wire)
-                        dst_blk.in_wires.append(wire)
-                        
-                        if scene is not None:
-                            scene.addItem(wire)
+                # Use auto-routed wire for better routing
+                wire = AutoRoutedWire(p_out, p_in)
+                wire.from_block = src_blk
+                wire.from_port = from_port
+                wire.to_block = dst_blk
+                wire.to_port = to_port
+                
+                # Add to wire lists
+                src_blk.out_wires.append(wire)
+                dst_blk.in_wires.append(wire)
+                
+                if scene is not None:
+                    scene.addItem(wire)
             
             # Update port colors for all new blocks
             for blk in new_blocks:

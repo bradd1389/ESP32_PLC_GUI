@@ -564,42 +564,53 @@ class VariablePanel(QWidget):
         count = 0
         for i in range(self.physical_table.rowCount()):
             type_widget = self.physical_table.cellWidget(i, 1)
-            if isinstance(type_widget, QComboBox) and type_widget.currentText() == io_type:
-                enabled_widget = self.physical_table.cellWidget(i, 7)
-                if isinstance(enabled_widget, QCheckBox) and enabled_widget.isChecked():
-                    count += 1
+            # Skip non-combobox widgets or wrong type
+            if not isinstance(type_widget, QComboBox) or type_widget.currentText() != io_type:
+                continue
+                
+            enabled_widget = self.physical_table.cellWidget(i, 7)
+            if isinstance(enabled_widget, QCheckBox) and enabled_widget.isChecked():
+                count += 1
         
         # Find appropriate pin and enable it
         for i in range(self.physical_table.rowCount()):
             type_widget = self.physical_table.cellWidget(i, 1)
             enabled_widget = self.physical_table.cellWidget(i, 7)
             
-            if (isinstance(type_widget, QComboBox) and 
-                isinstance(enabled_widget, QCheckBox) and
-                not enabled_widget.isChecked()):
+            # Skip if not proper widgets or already enabled
+            if (not isinstance(type_widget, QComboBox) or 
+                not isinstance(enabled_widget, QCheckBox) or
+                enabled_widget.isChecked()):
+                continue
                 
-                # Check if this pin supports the requested type
-                pin_item = self.physical_table.item(i, 2)
-                if pin_item:
-                    pin_name = pin_item.text()
-                    pin_config = pin_definitions.get(pin_name, {})
-                    
-                    # Set appropriate type and enable
-                    available_types = [type_widget.itemText(j) for j in range(type_widget.count())]
-                    if io_type in available_types:
-                        type_widget.setCurrentText(io_type)
-                        enabled_widget.setChecked(True)
-                        
-                        # Update tag name
-                        name_widget = self.physical_table.cellWidget(i, 0)
-                        if isinstance(name_widget, QLineEdit):
-                            prefix = {"Digital Input": "DI", "Digital Output": "DO", 
-                                    "Analog Input": "AI", "Analog Output": "AO", "PWM Output": "PWM"}
-                            name_widget.setText(f"{prefix.get(io_type, 'IO')}_{count:02d}")
-                        
-                        self.update_tag_tree()
-                        self.tags_modified.emit()
-                        break
+            # Check if this pin supports the requested type
+            pin_item = self.physical_table.item(i, 2)
+            # Skip if no pin item
+            if not pin_item:
+                continue
+                
+            pin_name = pin_item.text()
+            pin_config = pin_definitions.get(pin_name, {})
+            
+            # Set appropriate type and enable
+            available_types = [type_widget.itemText(j) for j in range(type_widget.count())]
+            # Skip if requested type not available
+            if io_type not in available_types:
+                continue
+                
+            type_widget.setCurrentText(io_type)
+            enabled_widget.setChecked(True)
+            
+            # Update tag name
+            name_widget = self.physical_table.cellWidget(i, 0)
+            if isinstance(name_widget, QLineEdit):
+                prefix = {"Digital Input": "DI", "Digital Output": "DO", 
+                        "Analog Input": "AI", "Analog Output": "AO", "PWM Output": "PWM"}
+                name_widget.setText(f"{prefix.get(io_type, 'IO')}_{count:02d}")
+            
+            self.update_tag_tree()
+            self.tags_modified.emit()
+            break
 
     def add_software_variable(self):
         """Add a new software variable"""
@@ -682,17 +693,23 @@ class VariablePanel(QWidget):
     def on_tag_selected(self):
         """Handle tag selection in tree"""
         current_item = self.tag_tree.currentItem()
-        if current_item:
-            parent = current_item.parent()
-            if parent:
-                # Switch to appropriate tab based on selection
-                parent_text = parent.text(0)
-                if parent_text == "Physical I/O":
-                    self.tab_widget.setCurrentIndex(0)
-                elif parent_text == "Hardware Registers":
-                    self.tab_widget.setCurrentIndex(1)
-                elif parent_text == "Software Variables":
-                    self.tab_widget.setCurrentIndex(2)
+        # Early return if no current item
+        if not current_item:
+            return
+            
+        parent = current_item.parent()
+        # Early return if no parent
+        if not parent:
+            return
+            
+        # Switch to appropriate tab based on selection
+        parent_text = parent.text(0)
+        if parent_text == "Physical I/O":
+            self.tab_widget.setCurrentIndex(0)
+        elif parent_text == "Hardware Registers":
+            self.tab_widget.setCurrentIndex(1)
+        elif parent_text == "Software Variables":
+            self.tab_widget.setCurrentIndex(2)
 
     def update_tag_tree(self):
         """Update the tag tree with current tags"""
@@ -704,36 +721,42 @@ class VariablePanel(QWidget):
         # Add physical I/O tags
         for i in range(self.physical_table.rowCount()):
             enabled_widget = self.physical_table.cellWidget(i, 7)
-            if isinstance(enabled_widget, QCheckBox) and enabled_widget.isChecked():
-                name_widget = self.physical_table.cellWidget(i, 0)
-                type_widget = self.physical_table.cellWidget(i, 1)
-                address_item = self.physical_table.item(i, 3)
+            # Skip disabled widgets
+            if not isinstance(enabled_widget, QCheckBox) or not enabled_widget.isChecked():
+                continue
                 
-                if isinstance(name_widget, QLineEdit) and isinstance(type_widget, QComboBox):
-                    item = QTreeWidgetItem([
-                        name_widget.text(),
-                        type_widget.currentText(),
-                        address_item.text() if address_item else "",
-                        "N/A"
-                    ])
-                    self.physical_node.addChild(item)
+            name_widget = self.physical_table.cellWidget(i, 0)
+            type_widget = self.physical_table.cellWidget(i, 1)
+            address_item = self.physical_table.item(i, 3)
+            
+            if isinstance(name_widget, QLineEdit) and isinstance(type_widget, QComboBox):
+                item = QTreeWidgetItem([
+                    name_widget.text(),
+                    type_widget.currentText(),
+                    address_item.text() if address_item else "",
+                    "N/A"
+                ])
+                self.physical_node.addChild(item)
         
         # Add hardware register tags
         for i in range(self.register_table.rowCount()):
             enabled_widget = self.register_table.cellWidget(i, 6)
-            if isinstance(enabled_widget, QCheckBox) and enabled_widget.isChecked():
-                name_widget = self.register_table.cellWidget(i, 0)
-                type_item = self.register_table.item(i, 3)
-                address_item = self.register_table.item(i, 2)
+            # Skip disabled widgets
+            if not isinstance(enabled_widget, QCheckBox) or not enabled_widget.isChecked():
+                continue
                 
-                if isinstance(name_widget, QLineEdit):
-                    item = QTreeWidgetItem([
-                        name_widget.text(),
-                        type_item.text() if type_item else "",
-                        address_item.text() if address_item else "",
-                        "N/A"
-                    ])
-                    self.register_node.addChild(item)
+            name_widget = self.register_table.cellWidget(i, 0)
+            type_item = self.register_table.item(i, 3)
+            address_item = self.register_table.item(i, 2)
+            
+            if isinstance(name_widget, QLineEdit):
+                item = QTreeWidgetItem([
+                    name_widget.text(),
+                    type_item.text() if type_item else "",
+                    address_item.text() if address_item else "",
+                    "N/A"
+                ])
+                self.register_node.addChild(item)
         
         # Add software variable tags
         for i in range(self.software_table.rowCount()):
@@ -763,8 +786,11 @@ class VariablePanel(QWidget):
         # Count enabled GPIO pins
         for i in range(self.physical_table.rowCount()):
             enabled_widget = self.physical_table.cellWidget(i, 7)
-            if isinstance(enabled_widget, QCheckBox) and enabled_widget.isChecked():
-                gpio_used += 1
+            # Skip disabled widgets
+            if not isinstance(enabled_widget, QCheckBox) or not enabled_widget.isChecked():
+                continue
+                
+            gpio_used += 1
         
         # Update labels
         self.ram_usage_label.setText(f"{ram_used / 1024:.1f} KB / 1024 KB")
@@ -786,13 +812,16 @@ class VariablePanel(QWidget):
         # Check physical I/O
         for i in range(self.physical_table.rowCount()):
             enabled_widget = self.physical_table.cellWidget(i, 7)
-            if isinstance(enabled_widget, QCheckBox) and enabled_widget.isChecked():
-                name_widget = self.physical_table.cellWidget(i, 0)
-                if isinstance(name_widget, QLineEdit):
-                    name = name_widget.text()
-                    if name in names:
-                        errors.append(f"Duplicate tag name: {name}")
-                    names.add(name)
+            # Skip disabled widgets
+            if not isinstance(enabled_widget, QCheckBox) or not enabled_widget.isChecked():
+                continue
+                
+            name_widget = self.physical_table.cellWidget(i, 0)
+            if isinstance(name_widget, QLineEdit):
+                name = name_widget.text()
+                if name in names:
+                    errors.append(f"Duplicate tag name: {name}")
+                names.add(name)
         
         # Check software variables
         for i in range(self.software_table.rowCount()):
@@ -845,13 +874,16 @@ class VariablePanel(QWidget):
         try:
             config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
                                       "templates", "tags_config.json")
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    config = json.load(f)
-                self.load_tag_configuration(config)
-                print("Existing tag configuration loaded successfully")
-            else:
+            # Early return if config doesn't exist
+            if not os.path.exists(config_path):
                 print("No existing tag configuration found - using defaults")
+                return
+                
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            self.load_tag_configuration(config)
+            print("Existing tag configuration loaded successfully")
+            
         except Exception as e:
             print(f"Could not load existing tags: {e}")
             # Continue with empty configuration - don't show error dialog on startup
@@ -980,26 +1012,29 @@ class VariablePanel(QWidget):
         # Find the row with this GPIO pin
         for i in range(self.physical_table.rowCount()):
             pin_item = self.physical_table.item(i, 2)
-            if pin_item and pin_item.text() == gpio_pin:
-                # Configure this row
-                name_widget = self.physical_table.cellWidget(i, 0)
-                type_widget = self.physical_table.cellWidget(i, 1)
-                data_type_widget = self.physical_table.cellWidget(i, 4)
-                initial_widget = self.physical_table.cellWidget(i, 5)
-                enabled_widget = self.physical_table.cellWidget(i, 7)
+            # Skip rows without matching GPIO pin
+            if not pin_item or pin_item.text() != gpio_pin:
+                continue
                 
-                if isinstance(name_widget, QLineEdit):
-                    name_widget.setText(tag_config.get("name", ""))
-                if isinstance(type_widget, QComboBox):
-                    type_widget.setCurrentText(tag_config.get("io_type", ""))
-                if isinstance(data_type_widget, QComboBox):
-                    data_type_widget.setCurrentText(tag_config.get("data_type", ""))
-                if isinstance(initial_widget, QLineEdit):
-                    initial_widget.setText(tag_config.get("initial_value", ""))
-                if isinstance(enabled_widget, QCheckBox):
-                    enabled_widget.setChecked(True)
-                
-                break
+            # Configure this row
+            name_widget = self.physical_table.cellWidget(i, 0)
+            type_widget = self.physical_table.cellWidget(i, 1)
+            data_type_widget = self.physical_table.cellWidget(i, 4)
+            initial_widget = self.physical_table.cellWidget(i, 5)
+            enabled_widget = self.physical_table.cellWidget(i, 7)
+            
+            if isinstance(name_widget, QLineEdit):
+                name_widget.setText(tag_config.get("name", ""))
+            if isinstance(type_widget, QComboBox):
+                type_widget.setCurrentText(tag_config.get("io_type", ""))
+            if isinstance(data_type_widget, QComboBox):
+                data_type_widget.setCurrentText(tag_config.get("data_type", ""))
+            if isinstance(initial_widget, QLineEdit):
+                initial_widget.setText(tag_config.get("initial_value", ""))
+            if isinstance(enabled_widget, QCheckBox):
+                enabled_widget.setChecked(True)
+            
+            break
 
     def add_software_variable_from_config(self, tag_config):
         """Add software variable from configuration"""

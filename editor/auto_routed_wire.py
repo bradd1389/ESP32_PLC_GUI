@@ -74,63 +74,74 @@ class AutoRoutedWire(QGraphicsPathItem):
 
     def _add_rounded_path(self, path, p1, p2, p3, p4, radius):
         """Add a path with rounded corners between four points"""
-        # Line from p1 towards p2
-        if (p2 - p1).manhattanLength() > radius * 2:
-            # Calculate point before corner
-            direction = p2 - p1
-            length = math.sqrt(direction.x()**2 + direction.y()**2)
-            if length > 0:
-                unit_dir = QPointF(direction.x() / length, direction.y() / length)
-                corner_start = QPointF(p2.x() - unit_dir.x() * radius, p2.y() - unit_dir.y() * radius)
-                path.lineTo(corner_start)
-                
-                # Add rounded corner from p2 to p3
-                if (p3 - p2).manhattanLength() > radius * 2:
-                    direction2 = p3 - p2
-                    length2 = math.sqrt(direction2.x()**2 + direction2.y()**2)
-                    if length2 > 0:
-                        unit_dir2 = QPointF(direction2.x() / length2, direction2.y() / length2)
-                        corner_end = QPointF(p2.x() + unit_dir2.x() * radius, p2.y() + unit_dir2.y() * radius)
-                        
-                        # Create rounded corner
-                        path.quadTo(p2, corner_end)
-                        
-                        # Continue to p3
-                        if (p4 - p3).manhattanLength() > radius * 2:
-                            direction3 = p4 - p3
-                            length3 = math.sqrt(direction3.x()**2 + direction3.y()**2)
-                            if length3 > 0:
-                                unit_dir3 = QPointF(direction3.x() / length3, direction3.y() / length3)
-                                corner_start2 = QPointF(p3.x() - unit_dir2.x() * radius, p3.y() - unit_dir2.y() * radius)
-                                path.lineTo(corner_start2)
-                                
-                                # Final rounded corner
-                                corner_end2 = QPointF(p3.x() + unit_dir3.x() * radius, p3.y() + unit_dir3.y() * radius)
-                                path.quadTo(p3, corner_end2)
-                                path.lineTo(p4)
-                            else:
-                                path.lineTo(p3)
-                                path.lineTo(p4)
-                        else:
-                            path.lineTo(p3)
-                            path.lineTo(p4)
-                    else:
-                        path.lineTo(p2)
-                        path.lineTo(p3)
-                        path.lineTo(p4)
-                else:
-                    path.lineTo(p2)
-                    path.lineTo(p3)
-                    path.lineTo(p4)
-            else:
-                path.lineTo(p2)
-                path.lineTo(p3)
-                path.lineTo(p4)
-        else:
-            # Too short for rounded corners, use straight lines
+        # Early return for segments too short for rounded corners
+        if (p2 - p1).manhattanLength() <= radius * 2:
             path.lineTo(p2)
             path.lineTo(p3)
             path.lineTo(p4)
+            return
+            
+        # Calculate direction and length for first segment
+        direction = p2 - p1
+        length = math.sqrt(direction.x()**2 + direction.y()**2)
+        # Early return if no valid direction
+        if length <= 0:
+            path.lineTo(p2)
+            path.lineTo(p3)
+            path.lineTo(p4)
+            return
+            
+        # Calculate first corner
+        unit_dir = QPointF(direction.x() / length, direction.y() / length)
+        corner_start = QPointF(p2.x() - unit_dir.x() * radius, p2.y() - unit_dir.y() * radius)
+        path.lineTo(corner_start)
+        
+        # Early return if second segment too short for rounding
+        if (p3 - p2).manhattanLength() <= radius * 2:
+            path.lineTo(p2)
+            path.lineTo(p3)
+            path.lineTo(p4)
+            return
+            
+        # Calculate direction and length for second segment
+        direction2 = p3 - p2
+        length2 = math.sqrt(direction2.x()**2 + direction2.y()**2)
+        # Early return if no valid direction
+        if length2 <= 0:
+            path.lineTo(p2)
+            path.lineTo(p3)
+            path.lineTo(p4)
+            return
+            
+        # Create first rounded corner
+        unit_dir2 = QPointF(direction2.x() / length2, direction2.y() / length2)
+        corner_end = QPointF(p2.x() + unit_dir2.x() * radius, p2.y() + unit_dir2.y() * radius)
+        path.quadTo(p2, corner_end)
+        
+        # Early return if third segment too short for rounding
+        if (p4 - p3).manhattanLength() <= radius * 2:
+            path.lineTo(p3)
+            path.lineTo(p4)
+            return
+            
+        # Calculate direction and length for third segment
+        direction3 = p4 - p3
+        length3 = math.sqrt(direction3.x()**2 + direction3.y()**2)
+        # Early return if no valid direction
+        if length3 <= 0:
+            path.lineTo(p3)
+            path.lineTo(p4)
+            return
+            
+        # Create second rounded corner
+        unit_dir3 = QPointF(direction3.x() / length3, direction3.y() / length3)
+        corner_start2 = QPointF(p3.x() - unit_dir2.x() * radius, p3.y() - unit_dir2.y() * radius)
+        path.lineTo(corner_start2)
+        
+        # Final rounded corner
+        corner_end2 = QPointF(p3.x() + unit_dir3.x() * radius, p3.y() + unit_dir3.y() * radius)
+        path.quadTo(p3, corner_end2)
+        path.lineTo(p4)
 
     def update_endpoints(self, start_point, end_point):
         """Update the wire endpoints and regenerate the path"""

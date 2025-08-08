@@ -65,13 +65,15 @@ def validate_directory_path(dir_path: str, create_if_missing: bool = False) -> b
     path_obj = Path(dir_path)
     
     if not path_obj.exists():
-        if create_if_missing:
-            try:
-                path_obj.mkdir(parents=True, exist_ok=True)
-            except OSError as e:
-                raise ProjectFileError(f"Cannot create directory: {e}")
-        else:
+        # Early return if we shouldn't create missing directories
+        if not create_if_missing:
             raise ProjectFileError(f"Directory does not exist: {dir_path}")
+            
+        # Try to create the directory
+        try:
+            path_obj.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise ProjectFileError(f"Cannot create directory: {e}")
     
     if not path_obj.is_dir():
         raise ProjectFileError(f"Path is not a directory: {dir_path}")
@@ -120,20 +122,22 @@ def validate_project_data(data: Dict[str, Any]) -> bool:
     Raises:
         ProjectDataError: If validation fails
     """
+    # Early return if not a dictionary
     if not isinstance(data, dict):
         raise ProjectDataError("Project data must be a dictionary")
     
+    # Check for missing required keys early
     required_keys = ['blocks', 'wires', 'canvas_data']
     missing_keys = [key for key in required_keys if key not in data]
     
     if missing_keys:
         raise ProjectDataError(f"Missing required keys in project data: {missing_keys}")
     
-    # Validate blocks structure
+    # Early validation of blocks structure
     if not isinstance(data['blocks'], list):
         raise ProjectDataError("Project 'blocks' must be a list")
     
-    # Validate wires structure
+    # Early validation of wires structure  
     if not isinstance(data['wires'], list):
         raise ProjectDataError("Project 'wires' must be a list")
     
