@@ -218,6 +218,7 @@ sdkconfig.old
 
 # Log files
 *.log
+logs/
 
 # IDE and editor files
 *.swp

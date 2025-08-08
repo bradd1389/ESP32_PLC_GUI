@@ -11,9 +11,21 @@ from editor.toolbox import Toolbox
 from editor.project_panel import ProjectPanel
 from editor.setup_dialog import SetupDialog
 
+# Import improved error handling and utilities
+from utils import (
+    get_logger, ErrorHandler, ProjectFileError, ProjectDataError,
+    validate_file_path, validate_json_file, validate_project_data,
+    log_method_entry
+)
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        
+        # Initialize logger
+        self.logger = get_logger('MainWindow')
+        self.logger.info("Initializing ESP32 PLC GUI Main Window")
+        
         self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, False)
         self.resize(1400,800)
         self.setWindowTitle("Embedded PLC Flowchart GUI")
@@ -150,22 +162,60 @@ class MainWindow(QMainWindow):
             else:
                 print("Toolbox refresh method not available")
 
-    # File Management Methods
+    @log_method_entry
     def new_project(self):
-        """Create a new project"""
-        if self.project_modified:
-            reply = QMessageBox.question(self, 'New Project', 
-                                       'Current project has unsaved changes. Continue?',
-                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                       QMessageBox.StandardButton.No)
-            if reply == QMessageBox.StandardButton.No:
-                return
+        """Create a new project with improved error handling"""
+        self.logger.info("Creating new project")
         
-        # Clear the canvas and reset tags
-        self.canvas.clear_canvas()
+        # Early return if user cancels unsaved changes confirmation
+        if not self._confirm_unsaved_changes("New Project"):
+            return False
         
-        # Reset the variable panel
-        if hasattr(self, 'variable_panel'):
+        try:
+            # Clear the canvas and reset tags
+            self.canvas.clear_canvas()
+            
+            # Reset the variable panel
+            if hasattr(self, 'variable_panel'):
+                self._reset_variable_panel()
+            
+            self.current_project_file = None
+            self.project_modified = False
+            self.setWindowTitle("Embedded PLC Flowchart GUI - New Project")
+            
+            self.logger.info("New project created successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create new project: {e}")
+            ErrorHandler.handle_exception(e, self)
+            return False
+
+    def _confirm_unsaved_changes(self, operation_name: str) -> bool:
+        """
+        Confirm with user if they want to proceed with unsaved changes
+        
+        Args:
+            operation_name: Name of the operation (e.g., "New Project", "Open Project")
+        
+        Returns:
+            True if user confirms or no unsaved changes, False if user cancels
+        """
+        if not self.project_modified:
+            return True
+        
+        reply = QMessageBox.question(
+            self, 
+            operation_name, 
+            'Current project has unsaved changes. Continue?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
+    def _reset_variable_panel(self):
+        """Reset the variable panel to default state"""
+        try:
             # Clear existing tags and reload default configuration
             self.variable_panel.physical_table.setRowCount(0)
             self.variable_panel.software_table.setRowCount(0)
@@ -178,61 +228,182 @@ class MainWindow(QMainWindow):
             self.variable_panel.populate_hardware_registers_table()
             self.variable_panel.update_tag_tree()
             self.variable_panel.update_memory_overview()
-        
-        self.current_project_file = None
-        self.project_modified = False
-        self.setWindowTitle("Embedded PLC Flowchart GUI - New Project")
-        print("New project created")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to reset variable panel: {e}")
+            # Don't fail the entire operation for variable panel issues
 
+    @log_method_entry
     def open_project(self):
-        """Open an existing project"""
-        if self.project_modified:
-            reply = QMessageBox.question(self, 'Open Project', 
-                                       'Current project has unsaved changes. Continue?',
-                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                       QMessageBox.StandardButton.No)
-            if reply == QMessageBox.StandardButton.No:
-                return
+        """Open an existing project with improved error handling and early returns"""
+        self.logger.info("Opening project")
+        
+        # Early return if user cancels unsaved changes confirmation
+        if not self._confirm_unsaved_changes("Open Project"):
+            return False
 
-        file_path, _ = QFileDialog.getOpenFileName(self, 'Open Project', '', 
-                                                 'PLC Project Files (*.plc);;JSON Files (*.json);;All Files (*)')
-        if file_path:
-            try:
-                with open(file_path, 'r') as f:
-                    project_data = json.load(f)
-                
-                # Load project data into canvas
-                self.canvas.load_project(project_data)
-                
-                # Load tag configuration if available
-                if hasattr(self, 'variable_panel') and 'tags_configuration' in project_data:
-                    self.variable_panel.load_tag_configuration(project_data['tags_configuration'])
-                
-                self.current_project_file = file_path
-                self.project_modified = False
-                filename = os.path.basename(file_path)
-                self.setWindowTitle(f"Embedded PLC Flowchart GUI - {filename}")
-                print(f"Project loaded: {filename}")
-                
-            except Exception as e:
-                QMessageBox.critical(self, 'Error', f'Failed to open project:\n{str(e)}')
+        # Early return if no file selected
+        file_path = self._get_project_file_path()
+        if not file_path:
+            return False
 
+        # Load and apply project data
+        try:
+            project_data = self._load_project_data(file_path)
+            self._apply_project_data(project_data, file_path)
+            self.logger.info(f"Project opened successfully: {os.path.basename(file_path)}")
+            return True
+            
+        except (ProjectFileError, ProjectDataError) as e:
+            self.logger.error(f"Failed to open project: {e}")
+            ErrorHandler.handle_exception(e, self)
+            return False
+        except Exception as e:
+            self.logger.error(f"Unexpected error opening project: {e}")
+            ErrorHandler.handle_exception(ProjectFileError(f"Failed to open project: {e}"), self)
+            return False
+
+    def _get_project_file_path(self) -> str:
+        """Get project file path from user via file dialog"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            'Open Project', 
+            '', 
+            'PLC Project Files (*.plc);;JSON Files (*.json);;All Files (*)'
+        )
+        return file_path
+
+    def _load_project_data(self, file_path: str) -> dict:
+        """
+        Load and validate project data from file
+        
+        Args:
+            file_path: Path to project file
+            
+        Returns:
+            Validated project data
+            
+        Raises:
+            ProjectFileError: If file cannot be read or parsed
+            ProjectDataError: If project data structure is invalid
+        """
+        # Validate file path and readability
+        validate_file_path(file_path, check_exists=True, check_readable=True)
+        
+        # Load and validate JSON
+        project_data = validate_json_file(file_path)
+        
+        # Validate project data structure
+        validate_project_data(project_data)
+        
+        return project_data
+
+    def _apply_project_data(self, project_data: dict, file_path: str):
+        """
+        Apply loaded project data to the application
+        
+        Args:
+            project_data: Validated project data
+            file_path: Path to the project file
+        """
+        try:
+            # Load project data into canvas
+            self.canvas.load_project(project_data)
+            
+            # Load tag configuration if available
+            if hasattr(self, 'variable_panel') and 'tags_configuration' in project_data:
+                self.variable_panel.load_tag_configuration(project_data['tags_configuration'])
+            
+            # Update application state
+            self.current_project_file = file_path
+            self.project_modified = False
+            filename = os.path.basename(file_path)
+            self.setWindowTitle(f"Embedded PLC Flowchart GUI - {filename}")
+            
+        except Exception as e:
+            raise ProjectDataError(f"Failed to apply project data: {e}")
+
+    @log_method_entry
     def save_project(self):
-        """Save the current project"""
+        """Save the current project with improved error handling"""
+        self.logger.info("Saving project")
+        
         if self.current_project_file:
-            self._save_to_file(self.current_project_file)
+            return self._save_to_file(self.current_project_file)
         else:
-            self.save_project_as()
+            return self.save_project_as()
 
+    @log_method_entry
     def save_project_as(self):
         """Save the project with a new filename"""
-        file_path, _ = QFileDialog.getSaveFileName(self, 'Save Project As', '', 
-                                                 'PLC Project Files (*.plc);;JSON Files (*.json);;All Files (*)')
-        if file_path:
-            self._save_to_file(file_path)
+        self.logger.info("Saving project as new file")
+        
+        file_path = self._get_save_file_path()
+        if not file_path:
+            return False
+        
+        return self._save_to_file(file_path)
 
-    def _save_to_file(self, file_path):
-        """Internal method to save project data to file"""
+    def _get_save_file_path(self) -> str:
+        """Get save file path from user via file dialog"""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, 
+            'Save Project As', 
+            '', 
+            'PLC Project Files (*.plc);;JSON Files (*.json);;All Files (*)'
+        )
+        return file_path
+
+    def _save_to_file(self, file_path: str) -> bool:
+        """
+        Internal method to save project data to file with comprehensive error handling
+        
+        Args:
+            file_path: Path to save the file
+            
+        Returns:
+            True if save successful, False otherwise
+        """
+        try:
+            # Validate directory exists and is writable
+            directory = os.path.dirname(file_path)
+            if directory and not os.path.exists(directory):
+                raise ProjectFileError(f"Directory does not exist: {directory}")
+            
+            if directory and not os.access(directory, os.W_OK):
+                raise ProjectFileError(f"Directory is not writable: {directory}")
+            
+            # Prepare project data
+            project_data = self._prepare_project_data()
+            
+            # Save to file with proper encoding and error handling
+            self._write_project_file(file_path, project_data)
+            
+            # Update application state
+            self._update_save_state(file_path)
+            
+            self.logger.info(f"Project saved successfully: {os.path.basename(file_path)}")
+            return True
+            
+        except (ProjectFileError, ProjectDataError) as e:
+            self.logger.error(f"Failed to save project: {e}")
+            ErrorHandler.handle_exception(e, self)
+            return False
+        except Exception as e:
+            self.logger.error(f"Unexpected error saving project: {e}")
+            ErrorHandler.handle_exception(ProjectFileError(f"Failed to save project: {e}"), self)
+            return False
+
+    def _prepare_project_data(self) -> dict:
+        """
+        Prepare project data for saving
+        
+        Returns:
+            Complete project data dictionary
+            
+        Raises:
+            ProjectDataError: If data preparation fails
+        """
         try:
             # Get project data from canvas
             project_data = self.canvas.get_project_data()
@@ -249,25 +420,50 @@ class MainWindow(QMainWindow):
                 'description': 'Complete ESP32 PLC project with flowchart logic and tag configuration'
             }
             
-            with open(file_path, 'w') as f:
-                json.dump(project_data, f, indent=2)
-            
-            self.current_project_file = file_path
-            self.project_modified = False
-            filename = os.path.basename(file_path)
-            self.setWindowTitle(f"Embedded PLC Flowchart GUI - {filename}")
-            print(f"Project saved: {filename}")
+            return project_data
             
         except Exception as e:
-            QMessageBox.critical(self, 'Error', f'Failed to save project:\n{str(e)}')
+            raise ProjectDataError(f"Failed to prepare project data: {e}")
 
+    def _write_project_file(self, file_path: str, project_data: dict):
+        """
+        Write project data to file with proper error handling
+        
+        Args:
+            file_path: Path to write the file
+            project_data: Project data to write
+            
+        Raises:
+            ProjectFileError: If file write operation fails
+        """
+        try:
+            # Use context manager for proper file handling
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(project_data, f, indent=2, ensure_ascii=False)
+                
+        except PermissionError:
+            raise ProjectFileError(f"Permission denied writing to file: {file_path}")
+        except OSError as e:
+            raise ProjectFileError(f"OS error writing file {file_path}: {e}")
+        except (TypeError, ValueError) as e:
+            raise ProjectFileError(f"JSON serialization error: {e}")
+
+    def _update_save_state(self, file_path: str):
+        """Update application state after successful save"""
+        self.current_project_file = file_path
+        self.project_modified = False
+        filename = os.path.basename(file_path)
+        self.setWindowTitle(f"Embedded PLC Flowchart GUI - {filename}")
+
+    @log_method_entry
     def mark_project_modified(self):
-        """Mark the project as modified"""
+        """Mark the project as modified with logging"""
         if not self.project_modified:
             self.project_modified = True
             title = self.windowTitle()
             if not title.endswith('*'):
                 self.setWindowTitle(title + '*')
+            self.logger.debug("Project marked as modified")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -387,122 +583,150 @@ if __name__ == "__main__":
     sys.exit(app.exec())
 
 def main():
-    """Entry point for console script"""
-    app = QApplication(sys.argv)
+    """Entry point for console script with comprehensive error handling"""
+    logger = get_logger('Main')
     
-    # Set global application stylesheet to fix highlighting issues
-    global_style = """
-    QTableWidget {
-        selection-background-color: #3daee9;
-        selection-color: white;
-        alternate-background-color: #f0f0f0;
-        gridline-color: #d0d0d0;
-        background-color: white;
-        color: black;
-    }
-    
-    QTableWidget::item:selected {
-        background-color: #3daee9;
-        color: white;
-    }
-    
-    QTableWidget::item:hover {
-        background-color: #e0f0ff;
-        color: black;
-    }
-    
-    QTreeWidget {
-        selection-background-color: #3daee9;
-        selection-color: white;
-        alternate-background-color: #f0f0f0;
-        background-color: white;
-        color: black;
-    }
-    
-    QTreeWidget::item:selected {
-        background-color: #3daee9;
-        color: white;
-    }
-    
-    QTreeWidget::item:hover {
-        background-color: #e0f0ff;
-        color: black;
-    }
-    
-    QComboBox {
-        selection-background-color: #3daee9;
-        selection-color: white;
-        background-color: white;
-        color: black;
-    }
-    
-    QComboBox QAbstractItemView {
-        selection-background-color: #3daee9;
-        selection-color: white;
-        background-color: white;
-        color: black;
-    }
-    
-    QComboBox QAbstractItemView::item:selected {
-        background-color: #3daee9;
-        color: white;
-    }
-    
-    QComboBox QAbstractItemView::item:hover {
-        background-color: #e0f0ff;
-        color: black;
-    }
-    
-    QListWidget {
-        selection-background-color: #3daee9;
-        selection-color: white;
-        alternate-background-color: #f0f0f0;
-        background-color: white;
-        color: black;
-    }
-    
-    QListWidget::item:selected {
-        background-color: #3daee9;
-        color: white;
-    }
-    
-    QListWidget::item:hover {
-        background-color: #e0f0ff;
-        color: black;
-    }
-    
-    QLineEdit:focus {
-        border: 2px solid #3daee9;
-        background-color: white;
-        color: black;
-    }
-    
-    QTextEdit:focus {
-        border: 2px solid #3daee9;
-        background-color: white;
-        color: black;
-    }
-    
-    QTabWidget::pane {
-        border: 1px solid #c0c0c0;
-        background-color: white;
-    }
-    
-    QTabBar::tab:selected {
-        background-color: #3daee9;
-        color: white;
-    }
-    
-    QTabBar::tab:hover {
-        background-color: #e0f0ff;
-        color: black;
-    }
-    """
-    app.setStyleSheet(global_style)
-    
-    win = MainWindow()
-    win.show()
-    sys.exit(app.exec())
+    try:
+        logger.info("Starting ESP32 PLC GUI application")
+        
+        app = QApplication(sys.argv)
+        
+        # Set global application stylesheet to fix highlighting issues
+        global_style = """
+        QTableWidget {
+            selection-background-color: #3daee9;
+            selection-color: white;
+            alternate-background-color: #f0f0f0;
+            gridline-color: #d0d0d0;
+            background-color: white;
+            color: black;
+        }
+        
+        QTableWidget::item:selected {
+            background-color: #3daee9;
+            color: white;
+        }
+        
+        QTableWidget::item:hover {
+            background-color: #e0f0ff;
+            color: black;
+        }
+        
+        QTreeWidget {
+            selection-background-color: #3daee9;
+            selection-color: white;
+            alternate-background-color: #f0f0f0;
+            background-color: white;
+            color: black;
+        }
+        
+        QTreeWidget::item:selected {
+            background-color: #3daee9;
+            color: white;
+        }
+        
+        QTreeWidget::item:hover {
+            background-color: #e0f0ff;
+            color: black;
+        }
+        
+        QComboBox {
+            selection-background-color: #3daee9;
+            selection-color: white;
+            background-color: white;
+            color: black;
+        }
+        
+        QComboBox QAbstractItemView {
+            selection-background-color: #3daee9;
+            selection-color: white;
+            background-color: white;
+            color: black;
+        }
+        
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #3daee9;
+            color: white;
+        }
+        
+        QComboBox QAbstractItemView::item:hover {
+            background-color: #e0f0ff;
+            color: black;
+        }
+        
+        QListWidget {
+            selection-background-color: #3daee9;
+            selection-color: white;
+            alternate-background-color: #f0f0f0;
+            background-color: white;
+            color: black;
+        }
+        
+        QListWidget::item:selected {
+            background-color: #3daee9;
+            color: white;
+        }
+        
+        QListWidget::item:hover {
+            background-color: #e0f0ff;
+            color: black;
+        }
+        
+        QLineEdit:focus {
+            border: 2px solid #3daee9;
+            background-color: white;
+            color: black;
+        }
+        
+        QTextEdit:focus {
+            border: 2px solid #3daee9;
+            background-color: white;
+            color: black;
+        }
+        
+        QTabWidget::pane {
+            border: 1px solid #c0c0c0;
+            background-color: white;
+        }
+        
+        QTabBar::tab:selected {
+            background-color: #3daee9;
+            color: white;
+        }
+        
+        QTabBar::tab:hover {
+            background-color: #e0f0ff;
+            color: black;
+        }
+        """
+        app.setStyleSheet(global_style)
+        
+        # Create and show main window
+        win = MainWindow()
+        win.show()
+        
+        logger.info("Application started successfully")
+        
+        # Run application event loop
+        exit_code = app.exec()
+        
+        logger.info(f"Application exiting with code: {exit_code}")
+        return exit_code
+        
+    except Exception as e:
+        logger.critical(f"Critical error in main application: {e}", exc_info=True)
+        
+        # Try to show error dialog if possible
+        try:
+            if 'app' in locals():
+                ErrorHandler.handle_exception(e)
+            else:
+                # Fallback if QApplication couldn't be created
+                print(f"Critical error: {e}")
+        except:
+            print(f"Critical error: {e}")
+        
+        return 1  # Return error exit code
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
