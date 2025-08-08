@@ -18,6 +18,14 @@ class ProjectPanel(QWidget):
         layout.addWidget(self.add_sub_btn)
         self.setLayout(layout)
 
+    def update_project_name(self, project_name):
+        """Update the project name in the solution panel"""
+        if self.project_table.rowCount() > 0:
+            self.project_table.setItem(0, 0, QTableWidgetItem(project_name))
+            print(f"DEBUG: Updated solution panel with project name: {project_name}")
+        else:
+            print("DEBUG: No rows in project table to update")
+
     def setup_styles(self):
         """Configure proper styling to fix highlighting and selection issues"""
         style = """

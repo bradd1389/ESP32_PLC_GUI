@@ -24,6 +24,17 @@
 - [x] **Import Error Resolution** - Fixed type checking conflicts in variable_panel.py imports
 - [x] **Memory Allocation Updates** - Updated from 320KB to 1024KB RAM allocation for ESP32-S3-WROOM
 - [x] **PWM-based Analog Output** - Converted from DAC to PWM for ESP32-S3 compatibility
+- [x] **Startup Dialog Workflow** - Welcome dialog with New/Open/Skip project options
+- [x] **Clean New Project State** - Hardware-only tag initialization for new projects
+- [x] **Project Naming Integration** - Dynamic solution panel updates with project names
+- [x] **Import Path Resolution** - Fixed relative import errors for stable module loading
+
+## 🔄 High Priority - Active Issues
+
+### Tag Management System
+- [ ] **Software Tag Persistence** - Software tags still persist across new projects (needs fixing)
+- [ ] **Canvas Data Validation** - Project validation missing canvas_data structure (needs canvas_data field)
+- [ ] **Tag File Synchronization** - simple_tags.json not properly cleared during new project creation
 
 ## 🔄 High Priority - Missing Core Features
 

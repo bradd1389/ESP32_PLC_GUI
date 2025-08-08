@@ -1,0 +1,82 @@
+{
+  "DO_01": {
+    "name": "DO_01",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "AI_00": {
+    "name": "AI_00",
+    "tag_type": "INT",
+    "is_array": false
+  },
+  "DI_00": {
+    "name": "DI_00",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "AI_01": {
+    "name": "AI_01",
+    "tag_type": "INT",
+    "is_array": false
+  },
+  "DO_00": {
+    "name": "DO_00",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "DI_01": {
+    "name": "DI_01",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "AI_02": {
+    "name": "AI_02",
+    "tag_type": "INT",
+    "is_array": false
+  },
+  "IO_GPIO7": {
+    "name": "IO_GPIO7",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "open": {
+    "name": "open",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "VAR_001": {
+    "name": "VAR_001",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "VAR_002": {
+    "name": "VAR_002",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "int": {
+    "name": "int",
+    "tag_type": "INT",
+    "is_array": false
+  },
+  "VAR_004": {
+    "name": "VAR_004",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "VAR_005": {
+    "name": "VAR_005",
+    "tag_type": "BYTE",
+    "is_array": false
+  },
+  "VAR_006": {
+    "name": "VAR_006",
+    "tag_type": "BOOL",
+    "is_array": false
+  },
+  "new": {
+    "name": "new",
+    "tag_type": "BOOL",
+    "is_array": false
+  }
+}

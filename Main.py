@@ -11,6 +11,12 @@ from editor.toolbox import Toolbox
 from editor.project_panel import ProjectPanel
 from editor.setup_dialog import SetupDialog
 
+# Import tag manager for synchronization
+try:
+    from editor.tag_integration import tag_manager
+except ImportError:
+    tag_manager = None
+
 # Import improved error handling and utilities
 from utils import (
     get_logger, ErrorHandler, ProjectFileError, ProjectDataError,
@@ -96,6 +102,24 @@ class MainWindow(QMainWindow):
         view_menu_btn.setStyleSheet(btn_style)
         menu_layout.addWidget(view_menu_btn)
 
+        # Debug menu
+        debug_menu = QMenu("Debug", self)
+        self.debug_mode_action = QAction("Enable Debug Mode", self)
+        self.debug_mode_action.setCheckable(True)
+        self.debug_mode_action.triggered.connect(self.toggle_debug_mode)
+        debug_menu.addAction(self.debug_mode_action)
+        
+        self.show_values_action = QAction("Show Values", self)
+        self.show_values_action.setCheckable(True)
+        self.show_values_action.setEnabled(False)  # Disabled until debug mode is enabled
+        self.show_values_action.triggered.connect(self.toggle_show_values)
+        debug_menu.addAction(self.show_values_action)
+        
+        debug_menu_btn = QPushButton("Debug", self)
+        debug_menu_btn.setMenu(debug_menu)
+        debug_menu_btn.setStyleSheet(btn_style)
+        menu_layout.addWidget(debug_menu_btn)
+
         # Tags action as a button
         act_tags = QAction("Tags", self)
         tags_btn = QPushButton("Tags", self)
@@ -114,13 +138,23 @@ class MainWindow(QMainWindow):
         
         # Create the enhanced variable panel
         self.variable_panel = VariablePanel()
+        # Set up tag manager reference for auto-save/auto-load functionality
+        self.variable_panel.tag_manager = tag_manager
         tag_layout.addWidget(self.variable_panel)
         self.tag_dialog.setSizeGripEnabled(True)
         
         # Connect variable panel signals
         self.variable_panel.tags_modified.connect(self.mark_project_modified)
+        
+        # Connect to TagManager signals to refresh main window tags when tags are added from logic blocks
+        if tag_manager is not None:
+            tag_manager.tag_added.connect(self.on_external_tag_added)
 
         def show_tag_dialog():
+            # Refresh the variable panel to show any new tags added from logic blocks
+            if hasattr(self.variable_panel, 'update_tag_tree'):
+                self.variable_panel.update_tag_tree()
+            
             # Center the dialog in the main window
             parent_geom = self.geometry()
             dlg_geom = self.tag_dialog.frameGeometry()
@@ -132,14 +166,17 @@ class MainWindow(QMainWindow):
         tags_btn.clicked.connect(show_tag_dialog)
 
         # Connect file menu actions
-        act_new.triggered.connect(self.new_project)
-        act_open.triggered.connect(self.open_project)
-        act_save.triggered.connect(self.save_project)
-        act_saveas.triggered.connect(self.save_project_as)
+        act_new.triggered.connect(lambda: self.new_project())
+        act_open.triggered.connect(lambda: self.open_project())
+        act_save.triggered.connect(lambda: self.save_project())
+        act_saveas.triggered.connect(lambda: self.save_project_as())
         
         # Initialize project state
         self.current_project_file = None
         self.project_modified = False
+        
+        # Show startup dialog after UI is fully initialized
+        QTimer.singleShot(100, self.show_startup_dialog)
         
         QTimer.singleShot(0,lambda: self.canvas.ensureVisible(0,0,1,1))
 
@@ -148,6 +185,12 @@ class MainWindow(QMainWindow):
         variable_panel = getattr(self, 'variable_panel', None)
         dlg = SetupDialog(self, variable_panel)
         dlg.exec()
+
+    def on_external_tag_added(self, tag_name):
+        """Called when a tag is added to TagManager from logic blocks"""
+        # Refresh the main window's variable panel to show the new tag
+        if hasattr(self.variable_panel, 'on_external_tag_added'):
+            self.variable_panel.on_external_tag_added(tag_name)
 
     def refresh_block_config(self):
         """Reload block configuration from JSON file"""
@@ -162,6 +205,42 @@ class MainWindow(QMainWindow):
             else:
                 print("Toolbox refresh method not available")
 
+    def toggle_debug_mode(self):
+        """Toggle debug mode for all logic blocks"""
+        debug_enabled = self.debug_mode_action.isChecked()
+        self.show_values_action.setEnabled(debug_enabled)
+        
+        # Update all logic blocks in the canvas
+        if self.canvas and self.canvas.scene():
+            scene = self.canvas.scene()
+            if scene:
+                from editor.logic_blocks import LogicBlock
+                for item in scene.items():
+                    if isinstance(item, LogicBlock):
+                        item.toggle_debug_mode(debug_enabled)
+        
+        if debug_enabled:
+            print("Debug mode enabled - logic blocks will show configuration details")
+        else:
+            print("Debug mode disabled")
+            # Reset show values to False when debug mode is disabled
+            self.show_values_action.setChecked(False)
+
+    def toggle_show_values(self):
+        """Toggle between showing tag names and values in debug mode"""
+        if self.canvas and self.canvas.scene():
+            scene = self.canvas.scene()
+            if scene:
+                from editor.logic_blocks import LogicBlock
+                for item in scene.items():
+                    if isinstance(item, LogicBlock):
+                        item.toggle_value_display()
+        
+        if self.show_values_action.isChecked():
+            print("Showing tag values in logic blocks")
+        else:
+            print("Showing tag names in logic blocks")
+
     @log_method_entry
     def new_project(self):
         """Create a new project with improved error handling"""
@@ -170,18 +249,50 @@ class MainWindow(QMainWindow):
         # Early return if user cancels unsaved changes confirmation
         if not self._confirm_unsaved_changes("New Project"):
             return False
+
+        # Ask user for project name and location
+        project_info = self._get_new_project_info()
+        if not project_info:
+            return False  # User cancelled
         
+        project_name, project_path = project_info
+
         try:
             # Clear the canvas and reset tags
             self.canvas.clear_canvas()
             
+            # Clear software tags for new project (keep only hardware I/O)
+            from editor.tag_integration import tag_manager
+            if tag_manager:
+                tag_manager.clear_software_tags()
+            
             # Reset the variable panel
             if hasattr(self, 'variable_panel'):
                 self._reset_variable_panel()
+                # Refresh to show only hardware tags
+                if hasattr(self.variable_panel, 'auto_load_tags'):
+                    self.variable_panel.auto_load_tags()
             
-            self.current_project_file = None
+            # Set the new project file path
+            self.current_project_file = project_path
             self.project_modified = False
-            self.setWindowTitle("Embedded PLC Flowchart GUI - New Project")
+            
+            # Update window title with project name
+            self.setWindowTitle(f"Embedded PLC Flowchart GUI - {project_name}")
+            
+            # Update solution panel if it exists
+            if hasattr(self, 'pd') and self.pd.widget():
+                project_panel = self.pd.widget()
+                # Use duck typing to check if the method exists
+                if hasattr(project_panel, 'update_project_name'):
+                    try:
+                        project_panel.update_project_name(project_name)  # type: ignore
+                    except Exception as e:
+                        print(f"DEBUG: Error updating project panel: {e}")
+                else:
+                    print("DEBUG: ProjectPanel doesn't have update_project_name method")
+            else:
+                print("DEBUG: Solution panel (pd) not found or has no widget")
             
             self.logger.info("New project created successfully")
             return True
@@ -190,6 +301,101 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Failed to create new project: {e}")
             ErrorHandler.handle_exception(e, self)
             return False
+
+    def _get_new_project_info(self):
+        """Get project name and location from user"""
+        from PyQt6.QtWidgets import QInputDialog, QFileDialog
+        import os
+        
+        # Get project name
+        project_name, ok = QInputDialog.getText(
+            self, 
+            'New Project', 
+            'Enter project name:',
+            text='MyProject'
+        )
+        
+        if not ok or not project_name.strip():
+            return None
+        
+        project_name = project_name.strip()
+        
+        # Get project location
+        project_dir = QFileDialog.getExistingDirectory(
+            self,
+            'Select Project Location',
+            os.path.expanduser('~/Documents')
+        )
+        
+        if not project_dir:
+            return None
+        
+        # Create full project path
+        project_path = os.path.join(project_dir, f"{project_name}.plc")
+        
+        return project_name, project_path
+
+    def show_startup_dialog(self):
+        """Show startup dialog to choose between new project or open existing"""
+        from PyQt6.QtWidgets import QMessageBox
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle("ESP32 PLC GUI - Project Selection")
+        msg.setText("Welcome to ESP32 PLC GUI")
+        msg.setInformativeText("Would you like to create a new project or open an existing one?")
+        msg.setIcon(QMessageBox.Icon.Question)
+        
+        # Custom buttons
+        new_btn = msg.addButton("New Project", QMessageBox.ButtonRole.AcceptRole)
+        open_btn = msg.addButton("Open Existing", QMessageBox.ButtonRole.AcceptRole)
+        cancel_btn = msg.addButton("Skip", QMessageBox.ButtonRole.RejectRole)
+        
+        msg.setDefaultButton(new_btn)
+        
+        # Center the dialog on the main window
+        msg.move(
+            self.geometry().center().x() - msg.width() // 2,
+            self.geometry().center().y() - msg.height() // 2
+        )
+        
+        # Execute dialog and handle response
+        result = msg.exec()
+        
+        if msg.clickedButton() == new_btn:
+            self.new_project()
+        elif msg.clickedButton() == open_btn:
+            self.open_project()
+        elif msg.clickedButton() == cancel_btn:
+            # User skipped - leave with current state but clear software tags
+            self._reset_to_empty_project()
+
+    def _reset_to_empty_project(self):
+        """Reset to an empty project state with no tags"""
+        self.canvas.clear_canvas()
+        
+        # Clear software tags (keep only hardware I/O)
+        from editor.tag_integration import tag_manager
+        if tag_manager:
+            tag_manager.clear_software_tags()
+        
+        if hasattr(self, 'variable_panel'):
+            self._reset_variable_panel()
+            # Refresh to show only hardware tags
+            if hasattr(self.variable_panel, 'auto_load_tags'):
+                self.variable_panel.auto_load_tags()
+                
+        self.current_project_file = None
+        self.project_modified = False
+        self.setWindowTitle("Embedded PLC Flowchart GUI - Untitled Project")
+        
+        # Update solution panel with default name
+        if hasattr(self, 'pd') and self.pd.widget():
+            project_panel = self.pd.widget()
+            if hasattr(project_panel, 'update_project_name'):
+                try:
+                    project_panel.update_project_name("Untitled Project")  # type: ignore
+                except Exception as e:
+                    print(f"DEBUG: Error updating project panel: {e}")
 
     def _confirm_unsaved_changes(self, operation_name: str) -> bool:
         """

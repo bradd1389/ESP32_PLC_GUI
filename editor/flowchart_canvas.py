@@ -8,6 +8,15 @@ from editor.draggable_block import DraggableBlock
 from editor.wire_segment import WireSegment
 from editor.auto_routed_wire import AutoRoutedWire
 
+# Import LogicBlock at module level to avoid runtime import issues
+try:
+    from editor.logic_blocks import LogicBlock
+    LOGIC_BLOCKS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: LogicBlock not available: {e}")
+    LogicBlock = None
+    LOGIC_BLOCKS_AVAILABLE = False
+
 class FlowchartCanvas(QGraphicsView):
     # Signal emitted when project is modified
     project_modified = pyqtSignal()
@@ -119,31 +128,53 @@ class FlowchartCanvas(QGraphicsView):
         # Get size from configuration
         width, height = self.get_block_size(text)
         rect = QRectF(0, 0, width, height)
-            
-        blk = DraggableBlock(rect)
-        # Set text by searching for QGraphicsTextItem child
-        from PyQt6.QtWidgets import QGraphicsTextItem
-        text_item = next((c for c in blk.childItems() if isinstance(c, QGraphicsTextItem)), None)
-        if text_item:
-            text_item.setPlainText(text)
+        
+        # Create appropriate block type
+        logic_block_types = ["ON?", "OFF?", "<", ">", "<=", ">=", "=", "≠", 
+                           "Copy", "Turn On/Off", "Timer / Clock", "Timer Compare"]
+        
+        if text in logic_block_types and LOGIC_BLOCKS_AVAILABLE and LogicBlock is not None:
+            blk = LogicBlock(text, rect, text)
+            # Show configuration dialog immediately when block is created
+            # Only add to scene if configuration is successful
+            if hasattr(blk, 'open_configuration_dialog'):
+                # Store position for later
+                target_pos = pt - QPointF(75, 20)
+                # Configure the block first
+                config_success = blk.open_configuration_dialog(delete_on_cancel=True)
+                if config_success is False:  # User canceled
+                    return  # Don't add block to scene
+                # If we get here, configuration was successful
+                blk.setPos(target_pos)
+            else:
+                blk.setPos(pt - QPointF(75, 20))
+        else:
+            blk = DraggableBlock(rect)
+            blk.setPos(pt - QPointF(75, 20))
+            # Set text by searching for QGraphicsTextItem child
+            from PyQt6.QtWidgets import QGraphicsTextItem
+            text_item = next((c for c in blk.childItems() if isinstance(c, QGraphicsTextItem)), None)
+            if text_item:
+                text_item.setPlainText(text)
         # Prevent overlap: check if new block would overlap any existing block
         new_rect = blk.mapRectToScene(blk.boundingRect())
         scene = self.scene()
         if scene is None:
             return
-        for item in scene.items():
-            # Use inverted returns to reduce nesting
-            if not isinstance(item, DraggableBlock) or item == blk:
-                continue
-                
-            if not item.mapRectToScene(item.boundingRect()).intersects(new_rect):
-                continue
-                
-            # Find a non-overlapping position nearby
-            offset = QPointF(blk.boundingRect().width() + 10, 0)
-            pt += offset
-            blk.setPos(pt - QPointF(75, 20))
-            new_rect = blk.mapRectToScene(blk.boundingRect())
+        # Remove overlap prevention - allow blocks to be placed close together
+        # for item in scene.items():
+        #     # Use inverted returns to reduce nesting
+        #     if not isinstance(item, DraggableBlock) or item == blk:
+        #         continue
+        #         
+        #     if not item.mapRectToScene(item.boundingRect()).intersects(new_rect):
+        #         continue
+        #         
+        #     # Find a non-overlapping position nearby
+        #     offset = QPointF(blk.boundingRect().width() + 10, 0)
+        #     pt += offset
+        #     blk.setPos(pt - QPointF(75, 20))
+        #     new_rect = blk.mapRectToScene(blk.boundingRect())
         scene.addItem(blk)
         blk.setPos(pt - QPointF(75, 20))
         
@@ -157,18 +188,8 @@ class FlowchartCanvas(QGraphicsView):
         x = min(max(blk.x(), cs), sr.width() - w)
         y = min(max(blk.y(), cs), sr.height() - h)
         blk.setPos(QPointF(x, y))
-        # Prevent overlap with other blocks
-        for item in scene.items():
-            # Use inverted returns to reduce nesting
-            if not isinstance(item, DraggableBlock) or item == blk:
-                continue
-                
-            if not item.mapRectToScene(item.boundingRect()).intersects(blk.mapRectToScene(blk.boundingRect())):
-                continue
-                
-            # Hard stop: revert to previous position
-            blk.setPos(blk.pos())
-            break
+        # Remove overlap prevention - allow blocks to get close to each other
+        # Implement hover visual feedback instead in DraggableBlock
 
         self._expand_scene()
         event.acceptProposedAction()
@@ -276,17 +297,7 @@ class FlowchartCanvas(QGraphicsView):
                     x = min(max(blk.x(), cs), sr.width() - w)
                     y = min(max(blk.y(), cs), sr.height() - h)
                     blk.setPos(QPointF(x, y))
-                    # Prevent overlap with other blocks
-                    for item in scene.items():
-                        # Skip non-blocks or same block
-                        if not isinstance(item, DraggableBlock) or item == blk:
-                            continue
-                            
-                        # Check for intersection and adjust position
-                        while item.mapRectToScene(item.boundingRect()).intersects(blk.mapRectToScene(blk.boundingRect())):
-                            blk.setPos(blk.pos() + QPointF(w + 10, 0))
-                            x = min(max(blk.x(), cs), sr.width() - w)
-                            blk.setPos(QPointF(x, y))
+                    # Remove overlap prevention - allow blocks to get close to each other
                 # Dynamically update wires for all blocks during move
                 for item in scene.items():
                     # Skip non-blocks
@@ -355,10 +366,10 @@ class FlowchartCanvas(QGraphicsView):
                 continue
                 
             dst = item.parentItem()
-            # Skip non-blocks or same block
-            if not isinstance(dst, DraggableBlock) or dst == self._dragging_from:
+            # Skip non-blocks
+            if not isinstance(dst, DraggableBlock):
                 continue
-                
+            
             # Find which port this is
             clicked_port = None
             for port_name, port in dst.ports.items():
@@ -369,6 +380,12 @@ class FlowchartCanvas(QGraphicsView):
             # Skip if no port found
             if not clicked_port:
                 continue
+            
+            # Allow self-connections for comparison blocks (feedback loops)
+            if dst == self._dragging_from:
+                # Skip if trying to connect output port to itself
+                if clicked_port == self._dragging_from_port:
+                    continue
                 
             # Check if this can be an input port (complete wire here)
             if not dst.assign_input_port(clicked_port):
@@ -395,8 +412,39 @@ class FlowchartCanvas(QGraphicsView):
             self._temp_wire.to_block = dst
             self._temp_wire.to_port = clicked_port
             
+            # Check for comparison block Y/N condition prompt (for output ports)
+            from editor.logic_blocks import LogicBlock
+            if (isinstance(self._dragging_from, LogicBlock) and 
+                hasattr(self._dragging_from, 'handle_wire_connection') and 
+                hasattr(self._dragging_from, 'has_multiple_outputs') and 
+                self._dragging_from.has_multiple_outputs):
+                # Let the comparison block handle the wire connection and condition assignment
+                # This is an output connection since we're dragging FROM this block
+                if not self._dragging_from.handle_wire_connection(self._dragging_from_port, self._temp_wire, is_output=True):
+                    # User cancelled, remove temp wire
+                    scene = self._temp_wire.scene()
+                    if scene:
+                        scene.removeItem(self._temp_wire)
+                    # Clear temp state
+                    self._temp_wire = None
+                    self._wire_points = []
+                    self._wire_start_point = None
+                    self._dragging_from = None
+                    self._dragging_from_port = None
+                    return super().mouseReleaseEvent(event)
+            
             # Add to wire lists
             if self._dragging_from:
+                # For non-comparison blocks, enforce single output wire
+                from editor.logic_blocks import LogicBlock
+                if (isinstance(self._dragging_from, LogicBlock) and 
+                    hasattr(self._dragging_from, 'has_multiple_outputs') and 
+                    not self._dragging_from.has_multiple_outputs and
+                    len(self._dragging_from.out_wires) > 0):
+                    # Remove existing output wire for non-comparison blocks
+                    existing_wire = self._dragging_from.out_wires[0]
+                    self._disconnect_wire(existing_wire)
+                
                 self._dragging_from.out_wires.append(self._temp_wire)
             dst.in_wires.append(self._temp_wire)
             
@@ -427,10 +475,10 @@ class FlowchartCanvas(QGraphicsView):
                     continue
                     
                 dst = item.parentItem()
-                # Skip non-blocks or same block
-                if not isinstance(dst, DraggableBlock) or dst == self._dragging_from:
+                # Skip non-blocks
+                if not isinstance(dst, DraggableBlock):
                     continue
-                    
+                
                 # Check if mouse is near this port
                 port_center = item.mapToScene(item.rect().center())
                 mouse_distance = (scene_pt - port_center).manhattanLength()
@@ -449,6 +497,12 @@ class FlowchartCanvas(QGraphicsView):
                 # Skip if no port found
                 if not clicked_port:
                     continue
+                
+                # Allow self-connections for comparison blocks (feedback loops)
+                if dst == self._dragging_from:
+                    # Skip if trying to connect output port to itself
+                    if clicked_port == self._dragging_from_port:
+                        continue
                     
                 # Check if this can be an input port (complete wire here)
                 if not dst.assign_input_port(clicked_port):
@@ -477,6 +531,16 @@ class FlowchartCanvas(QGraphicsView):
                 
                 # Add to wire lists
                 if self._dragging_from:
+                    # For non-comparison blocks, enforce single output wire
+                    from editor.logic_blocks import LogicBlock
+                    if (isinstance(self._dragging_from, LogicBlock) and 
+                        hasattr(self._dragging_from, 'has_multiple_outputs') and 
+                        not self._dragging_from.has_multiple_outputs and
+                        len(self._dragging_from.out_wires) > 0):
+                        # Remove existing output wire for non-comparison blocks
+                        existing_wire = self._dragging_from.out_wires[0]
+                        self._disconnect_wire(existing_wire)
+                    
                     self._dragging_from.out_wires.append(self._temp_wire)
                 dst.in_wires.append(self._temp_wire)
                 
@@ -650,6 +714,15 @@ class FlowchartCanvas(QGraphicsView):
                     if wire in getattr(blk, 'out_wires', []):
                         blk.out_wires.remove(wire)
                         wire_removed = True
+                        
+                        # Handle comparison block condition reset
+                        from editor.logic_blocks import LogicBlock
+                        if (isinstance(blk, LogicBlock) and 
+                            hasattr(blk, 'handle_wire_removal') and 
+                            hasattr(blk, 'has_multiple_outputs') and 
+                            blk.has_multiple_outputs and
+                            hasattr(wire, 'from_port')):
+                            blk.handle_wire_removal(wire.from_port, wire)
                     
                     # Reset port configuration if all wires are removed
                     if wire_removed and not blk.in_wires and not blk.out_wires:
@@ -796,7 +869,18 @@ class FlowchartCanvas(QGraphicsView):
         """Export current canvas state to a dictionary"""
         scene = self.scene()
         if scene is None:
-            return {"blocks": [], "wires": [], "version": "1.0"}
+            return {
+                "blocks": [], 
+                "wires": [], 
+                "canvas_data": {
+                    "zoom": 1.0,
+                    "scroll_x": 0,
+                    "scroll_y": 0,
+                    "cell_size": self.cell_size,
+                    "grid_enabled": True
+                },
+                "version": "1.0"
+            }
         
         blocks_data = []
         wires_data = []
@@ -839,7 +923,14 @@ class FlowchartCanvas(QGraphicsView):
             "version": "1.0",
             "blocks": blocks_data,
             "wires": wires_data,
-            "canvas_size": [self.cols, self.rows]
+            "canvas_data": {
+                "zoom": self.transform().m11(),  # Get current zoom level
+                "scroll_x": self.horizontalScrollBar().value() if self.horizontalScrollBar() else 0,
+                "scroll_y": self.verticalScrollBar().value() if self.verticalScrollBar() else 0,
+                "cell_size": self.cell_size,
+                "grid_enabled": True,
+                "canvas_size": [self.cols, self.rows]
+            }
         }
 
     def load_project(self, project_data):
